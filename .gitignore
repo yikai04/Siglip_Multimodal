@@ -1,0 +1,19 @@
+# Dataset images - too large for git
+Flickr8k/Images/
+
+# Model checkpoints
+outputs/resnet_mlp_4/
+outputs/resnet_transformer_v3_2/
+
+# Python cache
+__pycache__/
+*.pyc
+.mypy_cache/
+
+# IDE
+.vscode/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
