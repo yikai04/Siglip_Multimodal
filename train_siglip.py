@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 from collections import defaultdict
 
@@ -26,6 +27,7 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--warmup-steps", type=int, default=500, help="Number of warmup steps for cosine LR schedule.")
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--eval-batch-size", type=int, default=128)
@@ -102,7 +104,7 @@ def build_dataloaders(args):
     return tokenizer, train_loader, val_loader, test_loader
 
 
-def train_one_epoch(model, criterion, loader, optimizer, device):
+def train_one_epoch(model, criterion, loader, optimizer, scheduler, device):
     model.train()
     criterion.train()
     meter = AverageMeter()
@@ -116,6 +118,7 @@ def train_one_epoch(model, criterion, loader, optimizer, device):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
+        scheduler.step()
         meter.update(loss.item(), images.size(0))
     return meter.avg
 
@@ -209,7 +212,7 @@ def evaluate_retrieval(model, loader, device, topk=(1, 5, 10)):
     return metrics
 
 
-def save_checkpoint(path, model, criterion, optimizer, tokenizer, epoch, metrics, args, best_val_r1=None):
+def save_checkpoint(path, model, criterion, optimizer, scheduler, tokenizer, epoch, metrics, args, best_val_r1=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     torch.save(
         {
@@ -217,6 +220,7 @@ def save_checkpoint(path, model, criterion, optimizer, tokenizer, epoch, metrics
             "model": model.state_dict(),
             "criterion": criterion.state_dict(),
             "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
             "tokenizer_word2idx": tokenizer.word2idx,
             "metrics": metrics,
             "best_val_r1": best_val_r1,
@@ -255,7 +259,7 @@ def restore_tokenizer(tokenizer, checkpoint):
     return tokenizer
 
 
-def load_training_state(checkpoint, model, criterion, optimizer, device):
+def load_training_state(checkpoint, model, criterion, optimizer, scheduler, device):
     model.load_state_dict(checkpoint["model"])
     criterion.load_state_dict(checkpoint["criterion"])
     if "optimizer" in checkpoint:
@@ -264,6 +268,19 @@ def load_training_state(checkpoint, model, criterion, optimizer, device):
             for key, value in state.items():
                 if torch.is_tensor(value):
                     state[key] = value.to(device)
+    if "scheduler" in checkpoint:
+        scheduler.load_state_dict(checkpoint["scheduler"])
+
+
+class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
+    def __init__(self, optimizer, warmup_steps, total_steps, base_lr):
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return step / max(1, warmup_steps)
+            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            return 0.5 * (1 + math.cos(math.pi * progress))
+        super().__init__(optimizer, lr_lambda)
+        self.base_lr = base_lr
 
 
 def main():
@@ -294,12 +311,15 @@ def main():
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
+    total_steps = args.epochs * len(train_loader)
+    warmup_steps = min(args.warmup_steps, total_steps)
+    scheduler = CosineWarmupScheduler(optimizer, warmup_steps, total_steps, args.lr)
 
     print(f"device={device} vocab_size={len(tokenizer)} text_encoder={args.text_encoder}")
     start_epoch = 1
     best_val_r1 = -1.0
     if args.resume:
-        load_training_state(resume_checkpoint, model, criterion, optimizer, device)
+        load_training_state(resume_checkpoint, model, criterion, optimizer, scheduler, device)
         start_epoch = int(resume_checkpoint.get("epoch", 0)) + 1
         best_val_r1 = resume_checkpoint.get(
             "best_val_r1",
@@ -311,7 +331,7 @@ def main():
         )
 
     for epoch in range(start_epoch, args.epochs + 1):
-        train_loss = train_one_epoch(model, criterion, train_loader, optimizer, device)
+        train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device)
         val_loss = evaluate_loss(model, criterion, val_loader, device)
         val_metrics = evaluate_retrieval(model, val_loader, device)
         val_r1 = val_metrics["t2i_R@1"]
@@ -329,6 +349,7 @@ def main():
                 model,
                 criterion,
                 optimizer,
+                scheduler,
                 tokenizer,
                 epoch,
                 val_metrics,
@@ -340,6 +361,7 @@ def main():
             model,
             criterion,
             optimizer,
+            scheduler,
             tokenizer,
             epoch,
             val_metrics,
