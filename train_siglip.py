@@ -25,9 +25,11 @@ def parse_args():
     parser.add_argument("--max-len", type=int, default=32)
     parser.add_argument("--min-freq", type=int, default=2)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--warmup-steps", type=int, default=500, help="Number of warmup steps for cosine LR schedule.")
+    parser.add_argument("--warmup-steps", type=int, default=0, help="Fixed warmup steps; 0 means use --warmup-ratio.")
+    parser.add_argument("--warmup-ratio", type=float, default=0.1, help="Warmup as fraction of total steps (used when --warmup-steps=0).")
+    parser.add_argument("--min-lr-ratio", type=float, default=0.01, help="Minimum LR as fraction of base LR at the end of cosine decay.")
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--eval-batch-size", type=int, default=128)
@@ -273,12 +275,13 @@ def load_training_state(checkpoint, model, criterion, optimizer, scheduler, devi
 
 
 class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
-    def __init__(self, optimizer, warmup_steps, total_steps, base_lr):
+    def __init__(self, optimizer, warmup_steps, total_steps, base_lr, min_lr_ratio=0.01):
         def lr_lambda(step):
             if step < warmup_steps:
                 return step / max(1, warmup_steps)
             progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
-            return 0.5 * (1 + math.cos(math.pi * progress))
+            decay = 0.5 * (1 + math.cos(math.pi * progress))
+            return min_lr_ratio + (1 - min_lr_ratio) * decay
         super().__init__(optimizer, lr_lambda)
         self.base_lr = base_lr
 
@@ -312,8 +315,10 @@ def main():
         weight_decay=args.weight_decay,
     )
     total_steps = args.epochs * len(train_loader)
-    warmup_steps = min(args.warmup_steps, total_steps)
-    scheduler = CosineWarmupScheduler(optimizer, warmup_steps, total_steps, args.lr)
+    warmup_steps = args.warmup_steps if args.warmup_steps > 0 else int(args.warmup_ratio * total_steps)
+    warmup_steps = min(warmup_steps, total_steps)
+    scheduler = CosineWarmupScheduler(optimizer, warmup_steps, total_steps, args.lr, args.min_lr_ratio)
+    print(f"total_steps={total_steps} warmup_steps={warmup_steps} min_lr={args.lr * args.min_lr_ratio:.2e}")
 
     print(f"device={device} vocab_size={len(tokenizer)} text_encoder={args.text_encoder}")
     start_epoch = 1

@@ -13,7 +13,7 @@ def build_transform(image_size: int = 224, train: bool = True):
     if train:
         return T.Compose(
             [
-                T.Resize((image_size, image_size)),
+                T.RandomResizedCrop(image_size, scale=(0.5, 1.0), ratio=(0.75, 1.333)),
                 T.RandomHorizontalFlip(p=0.5),
                 T.ToTensor(),
                 T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
