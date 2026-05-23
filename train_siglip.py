@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--num-layers", type=int, default=2, help="Number of Transformer layers in text encoder.")
     parser.add_argument("--text-dropout", type=float, default=0.1, help="Dropout rate in Transformer text encoder.")
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--grad-accum", type=int, default=1, help="Gradient accumulation steps. Effective batch = batch_size * grad_accum.")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--warmup-steps", type=int, default=0, help="Fixed warmup steps; 0 means use --warmup-ratio.")
@@ -111,22 +112,25 @@ def build_dataloaders(args):
     return tokenizer, train_loader, val_loader, test_loader
 
 
-def train_one_epoch(model, criterion, loader, optimizer, scheduler, device):
+def train_one_epoch(model, criterion, loader, optimizer, scheduler, device, grad_accum=1):
     model.train()
     criterion.train()
     meter = AverageMeter()
-    for batch in tqdm(loader, desc="train", leave=False):
+    optimizer.zero_grad(set_to_none=True)
+    for step, batch in enumerate(tqdm(loader, desc="train", leave=False)):
         images = batch["image"].to(device, non_blocking=True)
         input_ids = batch["input_ids"].to(device, non_blocking=True)
         image_embeds, text_embeds = model(images, input_ids)
         loss = criterion(image_embeds, text_embeds)
+        loss = loss / grad_accum
 
-        optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
-        scheduler.step()
-        meter.update(loss.item(), images.size(0))
+        if (step + 1) % grad_accum == 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad(set_to_none=True)
+        meter.update(loss.item() * grad_accum, images.size(0))
     return meter.avg
 
 
@@ -373,7 +377,7 @@ def main():
         )
 
     for epoch in range(start_epoch, args.epochs + 1):
-        train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device)
+        train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device, grad_accum=args.grad_accum)
         if ema is not None:
             ema.update(model)
         eval_model = ema.shadow.to(device) if ema is not None else model
