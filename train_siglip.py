@@ -392,7 +392,7 @@ def main():
             best_val_r1 = val_r1
             save_checkpoint(
                 os.path.join(args.output_dir, "best_siglip.pt"),
-                eval_model,
+                model,
                 criterion,
                 optimizer,
                 scheduler,
