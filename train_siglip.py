@@ -298,9 +298,8 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 class ModelEMA:
     """Exponential Moving Average of model parameters for more stable evaluation."""
 
-    def __init__(self, model, decay=0.99, warmup_epochs=10):
+    def __init__(self, model, decay=0.999):
         self.decay = decay
-        self.warmup_epochs = warmup_epochs
         self.shadow = copy.deepcopy(model).cpu()
         self.shadow.eval()
         for p in self.shadow.parameters():
@@ -312,9 +311,6 @@ class ModelEMA:
         for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
             p_ema.data.mul_(self.decay).add_(p_model.data.cpu(), alpha=1.0 - self.decay)
         model.train()
-
-    def should_use_ema(self, epoch):
-        return epoch > self.warmup_epochs
 
     def to(self, device):
         self.shadow = self.shadow.to(device)
@@ -382,9 +378,8 @@ def main():
         train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device, grad_accum=args.grad_accum)
         if ema is not None:
             ema.update(model)
-        eval_model = ema.shadow.to(device) if (ema is not None and ema.should_use_ema(epoch)) else model
-        val_loss = evaluate_loss(eval_model, criterion, val_loader, device)
-        val_metrics = evaluate_retrieval(eval_model, val_loader, device)
+        val_loss = evaluate_loss(model, criterion, val_loader, device)
+        val_metrics = evaluate_retrieval(model, val_loader, device)
         val_r1 = val_metrics["t2i_R@1"]
         scale = criterion.logit_scale.exp().item()
         bias = criterion.logit_bias.item()
@@ -420,7 +415,12 @@ def main():
             best_val_r1=best_val_r1,
         )
 
-    final_model = ema.shadow.to(device) if (ema is not None and ema.should_use_ema(args.epochs)) else model
+    final_model = model
+    if ema is not None:
+        ema_model = ema.shadow.to(device)
+        ema_test_metrics = evaluate_retrieval(ema_model, test_loader, device)
+        ema_metric_text = " ".join([f"{name}={value * 100:.2f}" for name, value in ema_test_metrics.items()])
+        print(f"EMA test: {ema_metric_text}")
     test_loss = evaluate_loss(final_model, criterion, test_loader, device)
     test_metrics = evaluate_retrieval(final_model, test_loader, device)
     metric_text = " ".join([f"{name}={value * 100:.2f}" for name, value in test_metrics.items()])
