@@ -298,32 +298,23 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 class ModelEMA:
     """Exponential Moving Average of model parameters for more stable evaluation."""
 
-    def __init__(self, model, decay=0.999, warmup_steps=500):
+    def __init__(self, model, decay=0.999, warmup_epochs=5):
         self.decay = decay
-        self.warmup_steps = warmup_steps
-        self.step_count = 0
+        self.warmup_epochs = warmup_epochs
         self.shadow = copy.deepcopy(model).cpu()
         self.shadow.eval()
         for p in self.shadow.parameters():
             p.requires_grad_(False)
 
-    def _current_decay(self):
-        if self.step_count < self.warmup_steps:
-            return 0.0
-        progress = (self.step_count - self.warmup_steps) / max(1, self.warmup_steps)
-        return self.decay * min(1.0, progress)
-
     @torch.no_grad()
     def update(self, model):
         model.eval()
-        cur_decay = self._current_decay()
         for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
-            if cur_decay == 0.0:
-                p_ema.data.copy_(p_model.data.cpu())
-            else:
-                p_ema.data.mul_(cur_decay).add_(p_model.data.cpu(), alpha=1.0 - cur_decay)
+            p_ema.data.mul_(self.decay).add_(p_model.data.cpu(), alpha=1.0 - self.decay)
         model.train()
-        self.step_count += 1
+
+    def should_use_ema(self, epoch):
+        return epoch > self.warmup_epochs
 
     def to(self, device):
         self.shadow = self.shadow.to(device)
@@ -391,7 +382,7 @@ def main():
         train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device, grad_accum=args.grad_accum)
         if ema is not None:
             ema.update(model)
-        eval_model = ema.shadow.to(device) if ema is not None else model
+        eval_model = ema.shadow.to(device) if (ema is not None and ema.should_use_ema(epoch)) else model
         val_loss = evaluate_loss(eval_model, criterion, val_loader, device)
         val_metrics = evaluate_retrieval(eval_model, val_loader, device)
         val_r1 = val_metrics["t2i_R@1"]
@@ -429,7 +420,7 @@ def main():
             best_val_r1=best_val_r1,
         )
 
-    final_model = ema.shadow.to(device) if ema is not None else model
+    final_model = ema.shadow.to(device) if (ema is not None and ema.should_use_ema(args.epochs)) else model
     test_loss = evaluate_loss(final_model, criterion, test_loader, device)
     test_metrics = evaluate_retrieval(final_model, test_loader, device)
     metric_text = " ".join([f"{name}={value * 100:.2f}" for name, value in test_metrics.items()])
