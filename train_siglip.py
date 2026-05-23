@@ -309,9 +309,7 @@ class ModelEMA:
     def update(self, model):
         model.eval()
         for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
-            p_ema_data = p_ema.data
-            p_model_data = p_model.data.cpu()
-            p_ema.data.copy_(p_ema_data * self.decay + p_model_data * (1.0 - self.decay))
+            p_ema.data.mul_(self.decay).add_(p_model.data.cpu(), alpha=1.0 - self.decay)
         model.train()
 
     def to(self, device):
