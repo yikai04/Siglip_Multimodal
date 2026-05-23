@@ -298,7 +298,7 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 class ModelEMA:
     """Exponential Moving Average of model parameters for more stable evaluation."""
 
-    def __init__(self, model, decay=0.999, warmup_epochs=5):
+    def __init__(self, model, decay=0.99, warmup_epochs=10):
         self.decay = decay
         self.warmup_epochs = warmup_epochs
         self.shadow = copy.deepcopy(model).cpu()
