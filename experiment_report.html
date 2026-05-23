@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>SigLIP Model Optimization Experiment Report</title>
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+h2 { color: #34495e; margin-top: 30px; }
+h3 { color: #2980b9; }
+.card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+th, td { padding: 10px 12px; text-align: center; border: 1px solid #ddd; }
+th { background: #3498db; color: white; font-weight: 600; }
+td { background: #fafafa; }
+.highlight { background: #e8f8e8 !important; font-weight: bold; }
+.best { background: #d4edda !important; color: #155724; font-weight: bold; }
+.code-block { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; font-family: 'Consolas', monospace; white-space: pre-wrap; overflow-x: auto; }
+.diff-add { background: #e6ffed; color: #22863a; }
+.diff-remove { background: #ffeef0; color: #cb2431; }
+.tag { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+.tag-best { background: #d4edda; color: #155724; }
+.tag-mid { background: #fff3cd; color: #856404; }
+.tag-bad { background: #f8d7da; color: #721c24; }
+.progress { height: 20px; background: #e9ecef; border-radius: 10px; margin: 5px 0; }
+.progress-bar { height: 20px; border-radius: 10px; text-align: center; color: white; font-weight: 600; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 15px 0; }
+.summary-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+.summary-value { font-size: 24px; font-weight: bold; color: #3498db; }
+.summary-label { font-size: 14px; color: #7f8c8d; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>SigLIP Model Optimization Experiment Report</h1>
+<p><strong>Date:</strong> 2026-05-22 &mdash; 2026-05-23</p>
+<p><strong>Platform:</strong> NVIDIA RTX 4090 Laptop GPU</p>
+<p><strong>Dataset:</strong> Flickr8k (8000 images, 5 captions per image)</p>
+<p><strong>Model:</strong> ResNet-18 (width=32) + Transformer text encoder (2 layers, 4 heads, embed_dim=256)</p>
+
+<h2>Experiment Summary</h2>
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="summary-value" id="best-r1">34.78%</div>
+    <div class="summary-label">Best t2i R@1 (%)</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-value" id="best-i2t">37.93%</div>
+    <div class="summary-label">Best i2t R@1 (%)</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-value" id="best-r5">57.07%</div>
+    <div class="summary-label">Best t2i R@5 (%)</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-value" id="improvement">+13.52%</div>
+    <div class="summary-label">Improvement vs Baseline</div>
+  </div>
+</div>
+
+<h2>All Experiments Results</h2>
+<div class="card">
+<table>
+<thead>
+<tr>
+  <th>Experiment</th>
+  <th>LR Strategy</th>
+  <th>Augmentation</th>
+  <th>Epochs</th>
+  <th>Batch</th>
+  <th>t2i R@1 (%)</th>
+  <th>i2t R@1 (%)</th>
+  <th>t2i R@5 (%)</th>
+  <th>i2t R@5 (%)</th>
+  <th>t2i R@10 (%)</th>
+  <th>i2t R@10 (%)</th>
+  <th>Tag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Exp0 (Baseline)</td>
+  <td>Constant LR</td>
+  <td>Resize+Flip</td>
+  <td>30</td>
+  <td>256</td>
+  <td>21.26</td>
+  <td>20.88</td>
+  <td>45.77</td>
+  <td>44.26</td>
+  <td>56.72</td>
+  <td>56.47</td>
+  <td><span class="tag tag-bad">Baseline</span></td>
+</tr>
+<tr>
+  <td>Exp1 (Cosine+Warmup)</td>
+  <td>Cosine (min_lr=1%base)</td>
+  <td>Resize+Flip</td>
+  <td>30</td>
+  <td>256</td>
+  <td>29.83</td>
+  <td>32.07</td>
+  <td>55.54</td>
+  <td>56.81</td>
+  <td>65.50</td>
+  <td>67.48</td>
+  <td><span class="tag tag-best">Best</span></td>
+</tr>
+<tr>
+  <td>Exp2 (Crop 0.5)</td>
+  <td>Cosine (min_lr=1%base)</td>
+  <td>RandomResizedCrop(0.5)+Flip</td>
+  <td>30</td>
+  <td>256</td>
+  <td>12.58</td>
+  <td>13.59</td>
+  <td>31.27</td>
+  <td>33.31</td>
+  <td>43.08</td>
+  <td>44.92</td>
+  <td><span class="tag tag-bad">Too aggressive</span></td>
+</tr>
+<tr>
+  <td>Exp3 (Crop 0.75)</td>
+  <td>Cosine (min_lr=1%base)</td>
+  <td>RandomResizedCrop(0.75)+Flip</td>
+  <td>60</td>
+  <td>256</td>
+  <td>27.01</td>
+  <td>29.76</td>
+  <td>51.01</td>
+  <td>52.98</td>
+  <td>60.55</td>
+  <td>63.22</td>
+  <td><span class="tag tag-mid">Worse than Resize</span></td>
+</tr>
+<tr id="exp4-row">
+  <td>Exp4 (Cosine 100ep)</td>
+  <td>Cosine (min_lr=1%base)</td>
+  <td>Resize+Flip</td>
+  <td>100</td>
+  <td>256</td>
+  <td id="exp4-r1">34.78</td>
+  <td id="exp4-i2t">37.93</td>
+  <td id="exp4-r5">57.07</td>
+  <td id="exp4-r5i">60.15</td>
+  <td id="exp4-r10">65.40</td>
+  <td id="exp4-r10i">67.87</td>
+  <td id="exp4-tag"><span class="tag tag-best">BEST</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Key Finding: Loss Function Bug</h2>
+<div class="card">
+<h3>Critical Discovery</h3>
+<p>The original <code>repo_v2/loss.py</code> had a <strong>sign error</strong> compared to the working version in <code>~/repository</code>. This caused training loss to be ~200x higher (204 vs 6.2 at epoch 1) and made the model nearly unable to learn.</p>
+<h3>Difference</h3>
+<div class="code-block">
+<span class="diff-remove">- logits = -t * logits + b    # repo_v2 (WRONG sign convention)</span>
+<span class="diff-remove">- loss = labels * logits      # repo_v2 (WRONG sign convention)</span>
+<span class="diff-add">+ logits = t * logits + b     # repository (CORRECT, matches SigLIP paper)</span>
+<span class="diff-add">+ loss = -labels * logits     # repository (CORRECT, matches SigLIP paper)</span>
+</div>
+<p>After fixing this, loss dropped from 204 to 6.2 at epoch 1, and the model became trainable again.</p>
+</div>
+
+<h2>Experiment 0: Baseline (Constant LR)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>LR strategy: Constant (3e-4)</li>
+<li>Warmup: None</li>
+<li>Augmentation: Resize(224) + RandomHorizontalFlip</li>
+<li>Optimizer: AdamW, weight_decay=1e-4</li>
+<li>Epochs: 30, Batch: 256</li>
+</ul>
+<h3>Per-Epoch Results</h3>
+<table>
+<thead><tr><th>Epoch</th><th>Train Loss</th><th>Val Loss</th><th>t2i R@1 (%)</th><th>i2t R@1 (%)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>6.20</td><td>5.41</td><td>0.57</td><td>0.42</td></tr>
+<tr><td>5</td><td>4.39</td><td>4.29</td><td>2.62</td><td>2.06</td></tr>
+<tr><td>10</td><td>3.37</td><td>3.62</td><td>7.22</td><td>6.31</td></tr>
+<tr><td>15</td><td>2.73</td><td>3.12</td><td>9.31</td><td>10.03</td></tr>
+<tr><td>20</td><td>2.33</td><td>2.92</td><td>12.03</td><td>12.38</td></tr>
+<tr><td>25</td><td>1.93</td><td>2.68</td><td>16.21</td><td>15.00</td></tr>
+<tr><td>30</td><td>1.68</td><td>2.67</td><td>21.31</td><td>20.55</td></tr>
+</tbody>
+</table>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>21.26%</strong>, i2t_R@1=<strong>20.88%</strong>, t2i_R@5=45.77%, t2i_R@10=56.72%</p>
+</div>
+
+<h2>Experiment 1: Fixed Cosine + Warmup (Best)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>LR strategy: Cosine with warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</li>
+<li>Warmup: 10% of total steps (378 steps for 30 epochs)</li>
+<li>Min LR: 3e-6 (1% of base 3e-4)</li>
+<li>Augmentation: Resize(224) + RandomHorizontalFlip</li>
+<li>Optimizer: AdamW, weight_decay=1e-4</li>
+<li>Epochs: 30, Batch: 256</li>
+</ul>
+<h3>Key Code Changes</h3>
+<div class="code-block">
+class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
+    def __init__(self, optimizer, warmup_steps, total_steps, base_lr, min_lr_ratio=0.01):
+        def lr_lambda(step):
+            if step &lt; warmup_steps:
+                return step / max(1, warmup_steps)
+            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            decay = 0.5 * (1 + math.cos(math.pi * progress))
+            <span class="diff-add">return min_lr_ratio + (1 - min_lr_ratio) * decay</span>  # LR decays to min_lr, NOT to 0
+        super().__init__(optimizer, lr_lambda)
+</div>
+<h3>Per-Epoch Results</h3>
+<table>
+<thead><tr><th>Epoch</th><th>Train Loss</th><th>Val Loss</th><th>t2i R@1 (%)</th><th>i2t R@1 (%)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>6.83</td><td>5.71</td><td>0.25</td><td>0.24</td></tr>
+<tr><td>5</td><td>4.48</td><td>4.88</td><td>2.00</td><td>1.40</td></tr>
+<tr><td>10</td><td>2.78</td><td>3.71</td><td>6.48</td><td>6.18</td></tr>
+<tr><td>15</td><td>1.91</td><td>2.82</td><td>15.25</td><td>15.33</td></tr>
+<tr><td>20</td><td>1.37</td><td>2.61</td><td>23.02</td><td>22.61</td></tr>
+<tr><td>25</td><td>1.07</td><td>2.35</td><td>27.05</td><td>28.28</td></tr>
+<tr><td>30</td><td>0.97</td><td>2.34</td><td>28.21</td><td>30.13</td></tr>
+</tbody>
+</table>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>29.83%</strong>, i2t_R@1=<strong>32.07%</strong>, t2i_R@5=55.54%, t2i_R@10=65.50%</p>
+<p><strong>Improvement vs baseline: +8.57% t2i_R@1, +11.19% i2t_R@1</strong></p>
+</div>
+
+<h2>Experiment 2: RandomResizedCrop (scale=0.5) — Too Aggressive</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>LR strategy: Cosine with warmup (same as Exp1)</li>
+<li>Augmentation: <code>RandomResizedCrop(224, scale=(0.5, 1.0))</code> + RandomHorizontalFlip</li>
+<li>Epochs: 30, Batch: 256</li>
+</ul>
+<h3>Analysis</h3>
+<p>Crop scale 0.5 means the model can see as little as 50% of the original image. On Flickr8k (already small, varied images), this destroys too much context. The model struggles to learn consistent embeddings.</p>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>12.58%</strong>, i2t_R@1=<strong>13.59%</strong> — <em>Worse than baseline</em></p>
+</div>
+
+<h2>Experiment 3: RandomResizedCrop (scale=0.75) + 60 epochs</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>LR strategy: Cosine with warmup (same as Exp1)</li>
+<li>Augmentation: <code>RandomResizedCrop(224, scale=(0.75, 1.0))</code> + RandomHorizontalFlip</li>
+<li>Epochs: 60, Batch: 256</li>
+</ul>
+<h3>Per-Epoch Results</h3>
+<table>
+<thead><tr><th>Epoch</th><th>t2i R@1 (%)</th><th>i2t R@1 (%)</th></tr></thead>
+<tbody>
+<tr><td>15</td><td>7.02</td><td>6.80</td></tr>
+<tr><td>30</td><td>19.06</td><td>18.62</td></tr>
+<tr><td>50</td><td>25.09</td><td>26.88</td></tr>
+<tr><td>60</td><td>25.74</td><td>27.98</td></tr>
+</tbody>
+</table>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>27.01%</strong>, i2t_R@1=<strong>29.76%</strong> — Better than baseline but <em>2.8% lower than Exp1</em></p>
+<h3>Conclusion</h3>
+<p>Even with conservative crop (0.75), RandomResizedCrop hurts performance on Flickr8k. The small dataset (30k train pairs) doesn't benefit from aggressive augmentation — simpler Resize+Flip is more effective.</p>
+</div>
+
+<h2>Experiment 4: Best Config Extended (100 epochs)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>LR strategy: Cosine with warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</li>
+<li>Augmentation: Resize(224) + RandomHorizontalFlip (Exp1 best config)</li>
+<li>Epochs: 100, Batch: 256</li>
+<li>Total steps: 12600, Warmup steps: 1260</li>
+</ul>
+<h3>Test Result</h3>
+<p id="exp4-result">t2i_R@1=<strong>34.78%</strong>, i2t_R@1=<strong>37.93%</strong>, t2i_R@5=57.07%, t2i_R@10=65.40%</p>
+<p><strong>Improvement vs Exp1 (30ep): +4.95% t2i_R@1, +5.86% i2t_R@1</strong></p>
+<p><strong>Improvement vs baseline (Exp0): +13.52% t2i_R@1, +17.05% i2t_R@1</strong></p>
+</div>
+
+<h2>Why Cosine + Warmup Wins</h2>
+<div class="card">
+<h3>Comparison: Constant LR vs Cosine LR</h3>
+<p>With constant LR, the model uses the same learning rate throughout training. This leads to:</p>
+<ul>
+<li>Early epochs: learning rate is too high relative to the model's capability, causing instability</li>
+<li>Late epochs: learning rate is too low relative to the remaining gap, slowing convergence</li>
+</ul>
+<p>Cosine annealing with warmup addresses both issues:</p>
+<ul>
+<li><strong>Warmup (10% of total):</strong> Gradually increases LR from 0 to base_lr, preventing early instability</li>
+<li><strong>Cosine decay:</strong> Smoothly decreases LR, allowing fine-tuned adjustments in later epochs</li>
+<li><strong>Min LR floor (1% of base):</strong> Prevents LR from hitting 0, so the model continues learning even at the end</li>
+</ul>
+<h3>The Bug: LR Decaying to 0</h3>
+<p>The original CosineWarmupScheduler used <code>0.5 * (1 + cos(pi * progress))</code> which decays LR to <strong>0</strong> at the end. This means the last ~10-20% of training is essentially wasted — the model can't make meaningful updates. The fix adds a floor: <code>min_lr_ratio + (1 - min_lr_ratio) * decay</code>, keeping minimum LR at 1% of base (3e-6).</p>
+</div>
+
+<h2>Server Code Changes Summary</h2>
+<div class="card">
+<h3>Files Modified on Server (repo_v2)</h3>
+<table>
+<thead><tr><th>File</th><th>Change</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td>loss.py</td><td>Fixed sign convention: <code>t*logits+b</code> and <code>-labels*logits</code></td><td>Critical — model became trainable</td></tr>
+<tr><td>train_siglip.py</td><td>CosineWarmupScheduler with min_lr_ratio, warmup_ratio params</td><td>Major — +8.57% R@1 improvement</td></tr>
+<tr><td>train_siglip.py</td><td>Default epochs changed from 10 to 30</td><td>Moderate — longer training needed for cosine</td></tr>
+</tbody>
+</table>
+</div>
+
+</div>
+</body>
+</html>
