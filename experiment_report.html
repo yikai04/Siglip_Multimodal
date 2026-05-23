@@ -200,9 +200,28 @@ td { background: #fafafa; }
   <td>w=48, 2L, 4H, d=256</td>
   <td>Cosine (min_lr=1%base)</td>
   <td>Resize+Flip+ColorJitter</td>
-  <td>200</td>
-  <td colspan="6"><em>Running...</em></td>
-  <td><span class="tag tag-running">Running</span></td>
+  <td>Killed@97</td>
+  <td>~30</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td><span class="tag tag-bad">Overfitted at 200ep</span></td>
+</tr>
+<tr>
+  <td>Exp9 (Higher LR)</td>
+  <td>w=48, 2L, 4H, d=256</td>
+  <td>Cosine (<strong>LR=5e-4</strong>)</td>
+  <td>Resize+Flip+ColorJitter</td>
+  <td>100</td>
+  <td>34.55</td>
+  <td>37.36</td>
+  <td>56.55</td>
+  <td>58.91</td>
+  <td>65.63</td>
+  <td>67.76</td>
+  <td><span class="tag tag-mid">Worse than LR=3e-4</span></td>
 </tr>
 </tbody>
 </table>
@@ -357,19 +376,33 @@ class ModelEMA:
 <p>Flickr8k is too small for a 4-layer, 512-dim Transformer. The added capacity doesn't help because the dataset can't support it. Keep model small (2 layers, 256 dim) and focus on training strategies instead.</p>
 </div>
 
-<h2>Experiment 8: Best Config + 200 Epochs (Running)</h2>
+<h2>Experiment 8: Best Config + 200 Epochs (Overfitted)</h2>
 <div class="card">
 <h3>Configuration</h3>
 <ul>
 <li>ResNet-18 width=48, Transformer: 2 layers, 4 heads, embed_dim=256</li>
 <li>LR: Cosine+warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</li>
 <li>Augmentation: Resize+Flip+ColorJitter</li>
-<li><strong>Epochs: 200</strong></li>
+<li><strong>Epochs: 200</strong> (killed at epoch 97)</li>
 <li>Total steps: 25200, Warmup steps: 2520</li>
 </ul>
-<h3>Hypothesis</h3>
-<p>With the cosine schedule having a min_lr floor (1% of base), the model continues learning even at late epochs. Training for 200 epochs should push accuracy higher than the 100-epoch runs.</p>
-<p><em>Results will be updated when training completes.</em></p>
+<h3>Result: Overfitted</h3>
+<p>Val R@1 plateaued at ~30% around epoch 90 and started declining. Val loss kept increasing from epoch 50 onwards. Training was killed at epoch 97.</p>
+<p>This shows that <strong>100 epochs is the sweet spot</strong> for this model on Flickr8k. Training longer leads to overfitting, not improvement.</p>
+</div>
+
+<h2>Experiment 9: Higher Learning Rate (5e-4)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp5 but with <strong>LR=5e-4</strong> (vs 3e-4)</li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>34.55%</strong>, i2t_R@1=<strong>37.36%</strong></p>
+<p><strong>Worse than Exp5 (LR=3e-4): -1.31% t2i_R@1</strong></p>
+<h3>Conclusion</h3>
+<p>Higher learning rate doesn't help — the model converges faster but to a worse optimum. 3e-4 remains the best learning rate for this configuration.</p>
 </div>
 
 <h2>Why Cosine + Warmup Wins</h2>
