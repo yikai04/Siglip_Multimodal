@@ -27,6 +27,7 @@ class TransformerTextEncoder(nn.Module):
         num_layers: int = 2,
         max_len: int = 32,
         padding_idx: int = 0,
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.padding_idx = padding_idx
@@ -36,7 +37,7 @@ class TransformerTextEncoder(nn.Module):
             d_model=embed_dim,
             nhead=num_heads,
             dim_feedforward=embed_dim * 4,
-            dropout=0.1,
+            dropout=dropout,
             batch_first=True,
             activation="gelu",
             norm_first=True,

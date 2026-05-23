@@ -1,4 +1,5 @@
 import argparse
+import copy
 import math
 import os
 from collections import defaultdict
@@ -24,6 +25,9 @@ def parse_args():
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--max-len", type=int, default=32)
     parser.add_argument("--min-freq", type=int, default=2)
+    parser.add_argument("--num-heads", type=int, default=4, help="Number of attention heads in Transformer text encoder.")
+    parser.add_argument("--num-layers", type=int, default=2, help="Number of Transformer layers in text encoder.")
+    parser.add_argument("--text-dropout", type=float, default=0.1, help="Dropout rate in Transformer text encoder.")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -31,6 +35,7 @@ def parse_args():
     parser.add_argument("--warmup-ratio", type=float, default=0.1, help="Warmup as fraction of total steps (used when --warmup-steps=0).")
     parser.add_argument("--min-lr-ratio", type=float, default=0.01, help="Minimum LR as fraction of base LR at the end of cosine decay.")
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--ema-decay", type=float, default=0.0, help="EMA decay for model weights; 0 means no EMA. Typical: 0.999.")
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--eval-batch-size", type=int, default=128)
     parser.add_argument("--limit-train", type=int, default=0, help="Use the first N train samples; 0 means all.")
@@ -241,7 +246,7 @@ def torch_load_checkpoint(path, map_location):
 
 def apply_resume_model_args(args, checkpoint):
     checkpoint_args = checkpoint.get("args", {})
-    for name in ("text_encoder", "embed_dim", "image_width", "max_len"):
+    for name in ("text_encoder", "embed_dim", "image_width", "max_len", "num_heads", "num_layers", "text_dropout"):
         if name in checkpoint_args and getattr(args, name) != checkpoint_args[name]:
             print(
                 f"resume overrides --{name.replace('_', '-')}={getattr(args, name)} "
@@ -286,6 +291,30 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
         self.base_lr = base_lr
 
 
+class ModelEMA:
+    """Exponential Moving Average of model parameters for more stable evaluation."""
+
+    def __init__(self, model, decay=0.999):
+        self.decay = decay
+        self.shadow = copy.deepcopy(model).cpu()
+        self.shadow.eval()
+        for p in self.shadow.parameters():
+            p.requires_grad_(False)
+
+    @torch.no_grad()
+    def update(self, model):
+        model.eval()
+        for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
+            p_ema_data = p_ema.data
+            p_model_data = p_model.data.cpu()
+            p_ema.data.copy_(p_ema_data * self.decay + p_model_data * (1.0 - self.decay))
+        model.train()
+
+    def to(self, device):
+        self.shadow = self.shadow.to(device)
+        return self
+
+
 def main():
     args = parse_args()
     set_seed(args.seed)
@@ -307,6 +336,9 @@ def main():
         image_width=args.image_width,
         text_encoder=args.text_encoder,
         max_len=args.max_len,
+        num_heads=args.num_heads,
+        num_layers=args.num_layers,
+        text_dropout=args.text_dropout,
     ).to(device)
     criterion = SigLIPLoss().to(device)
     optimizer = torch.optim.AdamW(
@@ -323,6 +355,11 @@ def main():
     print(f"device={device} vocab_size={len(tokenizer)} text_encoder={args.text_encoder}")
     start_epoch = 1
     best_val_r1 = -1.0
+
+    ema = None
+    if args.ema_decay > 0:
+        ema = ModelEMA(model, decay=args.ema_decay)
+        print(f"EMA enabled with decay={args.ema_decay}")
     if args.resume:
         load_training_state(resume_checkpoint, model, criterion, optimizer, scheduler, device)
         start_epoch = int(resume_checkpoint.get("epoch", 0)) + 1
@@ -337,8 +374,11 @@ def main():
 
     for epoch in range(start_epoch, args.epochs + 1):
         train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device)
-        val_loss = evaluate_loss(model, criterion, val_loader, device)
-        val_metrics = evaluate_retrieval(model, val_loader, device)
+        if ema is not None:
+            ema.update(model)
+        eval_model = ema.shadow.to(device) if ema is not None else model
+        val_loss = evaluate_loss(eval_model, criterion, val_loader, device)
+        val_metrics = evaluate_retrieval(eval_model, val_loader, device)
         val_r1 = val_metrics["t2i_R@1"]
         scale = criterion.logit_scale.exp().item()
         bias = criterion.logit_bias.item()
@@ -351,7 +391,7 @@ def main():
             best_val_r1 = val_r1
             save_checkpoint(
                 os.path.join(args.output_dir, "best_siglip.pt"),
-                model,
+                eval_model,
                 criterion,
                 optimizer,
                 scheduler,
@@ -374,8 +414,9 @@ def main():
             best_val_r1=best_val_r1,
         )
 
-    test_loss = evaluate_loss(model, criterion, test_loader, device)
-    test_metrics = evaluate_retrieval(model, test_loader, device)
+    final_model = ema.shadow.to(device) if ema is not None else model
+    test_loss = evaluate_loss(final_model, criterion, test_loader, device)
+    test_metrics = evaluate_retrieval(final_model, test_loader, device)
     metric_text = " ".join([f"{name}={value * 100:.2f}" for name, value in test_metrics.items()])
     print(f"final test_loss={test_loss:.4f} {metric_text}")
 
