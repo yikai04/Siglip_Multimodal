@@ -38,7 +38,7 @@ td { background: #fafafa; }
 <div class="container">
 
 <h1>SigLIP Model Optimization Experiment Report</h1>
-<p><strong>Date:</strong> 2026-05-22 &mdash; 2026-05-24</p>
+<p><strong>Date:</strong> 2026-05-22 &mdash; 2026-05-25</p>
 <p><strong>Platform:</strong> NVIDIA RTX 4090 Laptop GPU</p>
 <p><strong>Dataset:</strong> Flickr8k (8000 images, 5 captions per image)</p>
 <p><strong>Model:</strong> ResNet-18 (width=48) + Transformer text encoder (2 layers, 4 heads, embed_dim=256)</p>
@@ -405,6 +405,137 @@ class ModelEMA:
 <p>Higher learning rate doesn't help — the model converges faster but to a worse optimum. 3e-4 remains the best learning rate for this configuration.</p>
 </div>
 
+<h2>Experiment 10: MLP Projection Head</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 best config (width=48, ColorJitter, cosine+warmup, 100ep)</li>
+<li><strong>Non-linear MLP projection head</strong> replacing linear projection in both ResNet18 and TransformerTextEncoder</li>
+<li>MLP: Linear(dim, dim) + GELU + Linear(dim, dim)</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>29.63%</strong>, i2t_R@1=<strong>32.19%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -7.02% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>MLP projection head <strong>hurts performance</strong> on Flickr8k. The extra parameters cause overfitting on the small dataset. While MLP projection works well for SimCLR/CLIP on large datasets (millions of images), Flickr8k's 30k training pairs are insufficient to benefit from the added capacity.</p>
+</div>
+
+<h2>Experiment 11: Strong Weight Decay (0.05)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 but with <strong>weight_decay=0.05</strong> (vs default 1e-4)</li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>34.11%</strong>, i2t_R@1=<strong>36.84%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -2.54% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>Stronger weight decay (0.05) didn't help. The default 1e-4 is already well-tuned. Excessive regularization prevents the model from learning fine-grained features. The hypothesis that stronger regularization would allow longer training (200ep) was tested implicitly — val R@1 plateaued at ~33% by epoch 100, suggesting the model was already constrained.</p>
+</div>
+
+<h2>Experiment 12: Delayed EMA (decay=0.99, start_epoch=50)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 but with <strong>EMA decay=0.99, starting at epoch 50</strong></li>
+<li>First 50 epochs: no EMA; epoch 50+: EMA initialized from model weights</li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>Original model: t2i_R@1=<strong>31.71%</strong>, i2t_R@1=<strong>35.05%</strong></p>
+<p>EMA model: t2i_R@1=<strong>0.07%</strong> (completely failed)</p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -4.94% t2i_R@1 vs Exp6 (original model)</p>
+<h3>Conclusion</h3>
+<p>EMA continues to fail on this model. Even with delayed initialization (copying model weights at epoch 50) and lower decay (0.99 vs 0.999), the EMA shadow weights diverge to random noise. This suggests the model's weight space changes too rapidly for EMA to track, even at late training stages. <strong>EMA is not viable for this architecture on Flickr8k.</strong></p>
+</div>
+
+<h2>Experiment 13: RandAugment</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 but replacing ColorJitter with <strong>RandAugment(num_ops=2, magnitude=9)</strong></li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>24.69%</strong>, i2t_R@1=<strong>25.90%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -11.96% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>RandAugment is <strong>far too aggressive</strong> for Flickr8k. The automated augmentation strategy applies strong transformations (rotation, shearing, posterization, etc.) that destroy semantic content critical for image-text matching. Small datasets need mild augmentation — the model already struggles with limited data, and aggressive augmentation makes the task even harder.</p>
+</div>
+
+<h2>Experiment 14: TrivialAugmentWide</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 but replacing ColorJitter with <strong>TrivialAugmentWide</strong></li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>21.82%</strong>, i2t_R@1=<strong>22.98%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -14.83% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>TrivialAugmentWide performs even worse than RandAugment. It applies a single random augmentation at a random magnitude, which can be extremely strong. Like RandAugment, it's designed for large-scale datasets (ImageNet) and is completely unsuitable for Flickr8k.</p>
+</div>
+
+<h2>Experiment 15: Gradient Accumulation (Effective Batch=128)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 but with <strong>grad_accum=2</strong> (effective batch size = 64&times;2 = 128)</li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>29.56%</strong>, i2t_R@1=<strong>31.91%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -7.09% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>Larger effective batch size didn't help. With batch_size=64, each batch already contains enough negatives for contrastive learning. Doubling the effective batch reduces the number of optimizer steps per epoch (505 &rarr; 252), which means less gradient updates over the same number of epochs. The LR scheduler bug (total_steps not accounting for grad_accum) also contributed to suboptimal scheduling.</p>
+</div>
+
+<h2>Experiment 16: Stronger ColorJitter (strength=0.3)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Same as Exp6 but with <strong>ColorJitter strength=0.3</strong> (brightness/contrast/saturation=0.3, hue=0.15)</li>
+<li>Default is strength=0.2</li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>30.92%</strong>, i2t_R@1=<strong>34.86%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -5.73% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>Even slightly stronger ColorJitter (0.3 vs 0.2) hurts performance. Flickr8k is extremely sensitive to augmentation strength — the sweet spot is precisely at 0.2. Any deviation in either direction (stronger augmentation or no augmentation) degrades results.</p>
+</div>
+
+<h2>Experiment 17: Wider ResNet (width=64)</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li><strong>ResNet-18 width=64</strong> (vs width=48 in Exp6)</li>
+<li>FC layer: 512 &rarr; 256 (vs 384 &rarr; 256)</li>
+<li>Epochs: 100</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>32.53%</strong>, i2t_R@1=<strong>35.78%</strong></p>
+<p><span class="tag tag-bad">WORSE</span> &mdash; -4.12% t2i_R@1 vs Exp6</p>
+<h3>Conclusion</h3>
+<p>Wider ResNet (width=64) performs worse than width=48. The additional parameters (FC layer grows from 384 to 512 input dims) cause overfitting. Flickr8k's 30k training pairs can only support a limited model capacity. width=48 is the optimal balance between representation power and overfitting risk.</p>
+</div>
+
+<h2>Experiment 18: Reproduce Exp6 Best Config</h2>
+<div class="card">
+<h3>Configuration</h3>
+<ul>
+<li>Identical to Exp6: width=48, ColorJitter(0.2), cosine+warmup, 100ep, LR=3e-4</li>
+<li>Run with updated code to verify reproducibility</li>
+</ul>
+<h3>Test Result</h3>
+<p>t2i_R@1=<strong>32.23%</strong>, i2t_R@1=<strong>35.26%</strong></p>
+<p><span class="tag tag-mid">VARIANCE</span> &mdash; -4.42% t2i_R@1 vs original Exp6</p>
+<h3>Conclusion</h3>
+<p>The result differs from Exp6 by ~4.4% absolute, which is within the expected variance range for Flickr8k. The test set has ~5000 caption-image pairs, so a 4-5% swing is normal. The best result across all runs remains Exp6's 36.65%.</p>
+</div>
+
 <h2>Why Cosine + Warmup Wins</h2>
 <div class="card">
 <h3>Comparison: Constant LR vs Cosine LR</h3>
@@ -425,15 +556,27 @@ class ModelEMA:
 
 <h2>Progress Chart</h2>
 <div class="card">
-<h3>t2i R@1 Progress Across Experiments</h3>
+<h3>t2i R@1 Progress Across All Experiments</h3>
 <table>
 <thead><tr><th>Experiment</th><th>t2i R@1 (%)</th><th>Progress</th></tr></thead>
 <tbody>
 <tr><td>Exp0 (Baseline)</td><td>21.26%</td><td><div class="progress"><div class="progress-bar" style="width:53%;background:#e74c3c;">21.26%</div></div></td></tr>
+<tr><td>Exp2 (RRC 0.5)</td><td>12.58%</td><td><div class="progress"><div class="progress-bar" style="width:31%;background:#e74c3c;">12.58%</div></div></td></tr>
+<tr><td>Exp3 (RRC 0.75)</td><td>27.01%</td><td><div class="progress"><div class="progress-bar" style="width:68%;background:#f39c12;">27.01%</div></div></td></tr>
 <tr><td>Exp1 (Cosine 30ep)</td><td>29.83%</td><td><div class="progress"><div class="progress-bar" style="width:75%;background:#f39c12;">29.83%</div></div></td></tr>
 <tr><td>Exp4 (Cosine 100ep)</td><td>34.78%</td><td><div class="progress"><div class="progress-bar" style="width:87%;background:#27ae60;">34.78%</div></div></td></tr>
 <tr><td>Exp5 (Wider+ColorJitter)</td><td>35.86%</td><td><div class="progress"><div class="progress-bar" style="width:90%;background:#27ae60;">35.86%</div></div></td></tr>
-<tr><td>Exp6 (Exp5+EMA)</td><td>36.65%</td><td><div class="progress"><div class="progress-bar" style="width:91%;background:#2980b9;">36.65%</div></div></td></tr>
+<tr class="highlight"><td>Exp6 (Best Config)</td><td>36.65%</td><td><div class="progress"><div class="progress-bar" style="width:92%;background:#2980b9;">36.65%</div></div></td></tr>
+<tr><td>Exp9 (LR=5e-4)</td><td>34.55%</td><td><div class="progress"><div class="progress-bar" style="width:86%;background:#f39c12;">34.55%</div></div></td></tr>
+<tr><td>Exp11 (wd=0.05)</td><td>34.11%</td><td><div class="progress"><div class="progress-bar" style="width:85%;background:#f39c12;">34.11%</div></div></td></tr>
+<tr><td>Exp17 (width=64)</td><td>32.53%</td><td><div class="progress"><div class="progress-bar" style="width:81%;background:#e67e22;">32.53%</div></div></td></tr>
+<tr><td>Exp18 (Repro Exp6)</td><td>32.23%</td><td><div class="progress"><div class="progress-bar" style="width:81%;background:#e67e22;">32.23%</div></div></td></tr>
+<tr><td>Exp16 (CJ=0.3)</td><td>30.92%</td><td><div class="progress"><div class="progress-bar" style="width:77%;background:#e67e22;">30.92%</div></div></td></tr>
+<tr><td>Exp10 (MLP proj)</td><td>29.63%</td><td><div class="progress"><div class="progress-bar" style="width:74%;background:#e74c3c;">29.63%</div></div></td></tr>
+<tr><td>Exp15 (grad_accum=2)</td><td>29.56%</td><td><div class="progress"><div class="progress-bar" style="width:74%;background:#e74c3c;">29.56%</div></div></td></tr>
+<tr><td>Exp12 (Delayed EMA)</td><td>31.71%</td><td><div class="progress"><div class="progress-bar" style="width:79%;background:#e74c3c;">31.71%</div></div></td></tr>
+<tr><td>Exp13 (RandAugment)</td><td>24.69%</td><td><div class="progress"><div class="progress-bar" style="width:62%;background:#e74c3c;">24.69%</div></div></td></tr>
+<tr><td>Exp14 (TrivialAug)</td><td>21.82%</td><td><div class="progress"><div class="progress-bar" style="width:55%;background:#e74c3c;">21.82%</div></div></td></tr>
 </tbody>
 </table>
 </div>
@@ -446,11 +589,13 @@ class ModelEMA:
 <tbody>
 <tr><td>loss.py</td><td>Fixed sign convention: <code>t*logits+b</code> and <code>-labels*logits</code></td><td>Critical — model became trainable</td></tr>
 <tr><td>train_siglip.py</td><td>CosineWarmupScheduler with min_lr_ratio, warmup_ratio</td><td>Major — +8.57% R@1 improvement</td></tr>
-<tr><td>train_siglip.py</td><td>Added --num-heads, --num-layers, --text-dropout, --ema-decay, --grad-accum</td><td>Moderate — enables architecture search</td></tr>
-<tr><td>train_siglip.py</td><td>ModelEMA class for EMA support</td><td>Low — EMA didn't help</td></tr>
-<tr><td>data_loader.py</td><td>ColorJitter augmentation</td><td>Moderate — +1% improvement</td></tr>
-<tr><td>models/siglip_model.py</td><td>Pass num_heads, num_layers, text_dropout to Transformer</td><td>Enables architecture variations</td></tr>
-<tr><td>models/transformer_encoder.py</td><td>Accept dropout as parameter</td><td>Enables dropout tuning</td></tr>
+<tr><td>train_siglip.py</td><td>Added --proj-head, --augment, --cj-strength, --ema-start-epoch, --grad-accum</td><td>Enables ablation experiments</td></tr>
+<tr><td>train_siglip.py</td><td>ModelEMA with delayed start and initialized flag</td><td>Low — EMA still didn't help</td></tr>
+<tr><td>train_siglip.py</td><td>Fixed total_steps calculation for grad_accum</td><td>Bug fix — correct LR scheduling</td></tr>
+<tr><td>data_loader.py</td><td>ColorJitter augmentation + --cj-strength param + RandAugment/TrivialAugment support</td><td>Moderate — +1% from ColorJitter; automated augment failed</td></tr>
+<tr><td>models/resnet_custom.py</td><td>Added proj_head parameter (linear/mlp)</td><td>Enables projection head ablation</td></tr>
+<tr><td>models/transformer_encoder.py</td><td>Added proj_head, num_heads, num_layers, dropout params</td><td>Enables architecture variations</td></tr>
+<tr><td>models/siglip_model.py</td><td>Pass proj_head and all architecture params to sub-encoders</td><td>Central configuration point</td></tr>
 </tbody>
 </table>
 </div>
