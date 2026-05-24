@@ -28,6 +28,7 @@ class TransformerTextEncoder(nn.Module):
         max_len: int = 32,
         padding_idx: int = 0,
         dropout: float = 0.1,
+        proj_head: str = "linear",
     ):
         super().__init__()
         self.padding_idx = padding_idx
@@ -43,7 +44,15 @@ class TransformerTextEncoder(nn.Module):
             norm_first=True,
         )
         self.encoder = nn.TransformerEncoder(layer, num_layers=num_layers)
-        self.proj = nn.Linear(embed_dim, embed_dim)
+        self.proj_head = proj_head
+        if proj_head == "mlp":
+            self.proj = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, embed_dim),
+            )
+        else:
+            self.proj = nn.Linear(embed_dim, embed_dim)
 
     def forward(self, input_ids):
         # TODO(STUDENT): students need to implement 

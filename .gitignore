@@ -2,8 +2,7 @@
 Flickr8k/Images/
 
 # Model checkpoints
-outputs/resnet_mlp_4/
-outputs/resnet_transformer_v3_2/
+outputs/
 
 # Python cache
 __pycache__/

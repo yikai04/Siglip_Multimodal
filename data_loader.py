@@ -9,17 +9,38 @@ from torchvision import transforms as T
 from utils import read_caption_file
 
 
-def build_transform(image_size: int = 224, train: bool = True):
+def build_transform(image_size: int = 224, train: bool = True, augment: str = "default"):
     if train:
-        return T.Compose(
-            [
-                T.Resize((image_size, image_size)),
-                T.RandomHorizontalFlip(p=0.5),
-                T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-                T.ToTensor(),
-                T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ]
-        )
+        if augment == "randaugment":
+            return T.Compose(
+                [
+                    T.Resize((image_size, image_size)),
+                    T.RandomHorizontalFlip(p=0.5),
+                    T.RandAugment(num_ops=2, magnitude=9),
+                    T.ToTensor(),
+                    T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                ]
+            )
+        elif augment == "trivialaugment":
+            return T.Compose(
+                [
+                    T.Resize((image_size, image_size)),
+                    T.RandomHorizontalFlip(p=0.5),
+                    T.TrivialAugmentWide(),
+                    T.ToTensor(),
+                    T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                ]
+            )
+        else:
+            return T.Compose(
+                [
+                    T.Resize((image_size, image_size)),
+                    T.RandomHorizontalFlip(p=0.5),
+                    T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+                    T.ToTensor(),
+                    T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                ]
+            )
     return T.Compose(
         [
             T.Resize((image_size, image_size)),

@@ -30,7 +30,7 @@ class BasicBlock(nn.Module):
 
 
 class ResNet18(nn.Module):
-    def __init__(self, width: int = 32, output_dim: int = 256):
+    def __init__(self, width: int = 32, output_dim: int = 256, proj_head: str = "linear"):
         super().__init__()
         self.in_channels = width
         self.conv1 = nn.Conv2d(3, width, kernel_size=7, stride=2, padding=3, bias=False)
@@ -42,7 +42,15 @@ class ResNet18(nn.Module):
         self.layer3 = self._make_layer(width * 4, 2, stride=2)
         self.layer4 = self._make_layer(width * 8, 2, stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(width * 8, output_dim)
+        hidden = width * 8
+        if proj_head == "mlp":
+            self.fc = nn.Sequential(
+                nn.Linear(hidden, hidden),
+                nn.GELU(),
+                nn.Linear(hidden, output_dim),
+            )
+        else:
+            self.fc = nn.Linear(hidden, output_dim)
 
     def _make_layer(self, out_channels, blocks, stride):
         downsample = None

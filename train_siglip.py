@@ -28,6 +28,8 @@ def parse_args():
     parser.add_argument("--num-heads", type=int, default=4, help="Number of attention heads in Transformer text encoder.")
     parser.add_argument("--num-layers", type=int, default=2, help="Number of Transformer layers in text encoder.")
     parser.add_argument("--text-dropout", type=float, default=0.1, help="Dropout rate in Transformer text encoder.")
+    parser.add_argument("--proj-head", choices=["linear", "mlp"], default="linear", help="Projection head type: linear or 2-layer MLP.")
+    parser.add_argument("--augment", choices=["default", "randaugment", "trivialaugment"], default="default", help="Training augmentation strategy.")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--grad-accum", type=int, default=1, help="Gradient accumulation steps. Effective batch = batch_size * grad_accum.")
     parser.add_argument("--epochs", type=int, default=30)
@@ -36,7 +38,8 @@ def parse_args():
     parser.add_argument("--warmup-ratio", type=float, default=0.1, help="Warmup as fraction of total steps (used when --warmup-steps=0).")
     parser.add_argument("--min-lr-ratio", type=float, default=0.01, help="Minimum LR as fraction of base LR at the end of cosine decay.")
     parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--ema-decay", type=float, default=0.0, help="EMA decay for model weights; 0 means no EMA. Typical: 0.999.")
+    parser.add_argument("--ema-decay", type=float, default=0.0, help="EMA decay for model weights; 0 means no EMA. Typical: 0.99.")
+    parser.add_argument("--ema-start-epoch", type=int, default=0, help="Epoch at which to start EMA updates. 0 means from the start.")
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--eval-batch-size", type=int, default=128)
     parser.add_argument("--limit-train", type=int, default=0, help="Use the first N train samples; 0 means all.")
@@ -69,7 +72,7 @@ def build_dataloaders(args):
             image_root=image_root,
             captions_file=os.path.join(args.data_dir, "train_captions.txt"),
             tokenizer=tokenizer,
-            transform=build_transform(args.image_size, train=True),
+            transform=build_transform(args.image_size, train=True, augment=args.augment),
         )
         val_dataset = Flickr8kDataset(
             image_root=image_root,
@@ -250,7 +253,7 @@ def torch_load_checkpoint(path, map_location):
 
 def apply_resume_model_args(args, checkpoint):
     checkpoint_args = checkpoint.get("args", {})
-    for name in ("text_encoder", "embed_dim", "image_width", "max_len", "num_heads", "num_layers", "text_dropout"):
+    for name in ("text_encoder", "embed_dim", "image_width", "max_len", "num_heads", "num_layers", "text_dropout", "proj_head"):
         if name in checkpoint_args and getattr(args, name) != checkpoint_args[name]:
             print(
                 f"resume overrides --{name.replace('_', '-')}={getattr(args, name)} "
@@ -298,16 +301,26 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 class ModelEMA:
     """Exponential Moving Average of model parameters for more stable evaluation."""
 
-    def __init__(self, model, decay=0.999):
+    def __init__(self, model, decay=0.99, start_epoch=0):
         self.decay = decay
+        self.start_epoch = start_epoch
+        self.initialized = False
         self.shadow = copy.deepcopy(model).cpu()
         self.shadow.eval()
         for p in self.shadow.parameters():
             p.requires_grad_(False)
 
     @torch.no_grad()
-    def update(self, model):
+    def update(self, model, epoch):
+        if epoch < self.start_epoch:
+            return
         model.eval()
+        if not self.initialized:
+            for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
+                p_ema.data.copy_(p_model.data.cpu())
+            self.initialized = True
+            model.train()
+            return
         for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
             p_ema.data.mul_(self.decay).add_(p_model.data.cpu(), alpha=1.0 - self.decay)
         model.train()
@@ -341,6 +354,7 @@ def main():
         num_heads=args.num_heads,
         num_layers=args.num_layers,
         text_dropout=args.text_dropout,
+        proj_head=args.proj_head,
     ).to(device)
     criterion = SigLIPLoss().to(device)
     optimizer = torch.optim.AdamW(
@@ -360,8 +374,8 @@ def main():
 
     ema = None
     if args.ema_decay > 0:
-        ema = ModelEMA(model, decay=args.ema_decay)
-        print(f"EMA enabled with decay={args.ema_decay}")
+        ema = ModelEMA(model, decay=args.ema_decay, start_epoch=args.ema_start_epoch)
+        print(f"EMA enabled with decay={args.ema_decay}, start_epoch={args.ema_start_epoch}")
     if args.resume:
         load_training_state(resume_checkpoint, model, criterion, optimizer, scheduler, device)
         start_epoch = int(resume_checkpoint.get("epoch", 0)) + 1
@@ -377,7 +391,7 @@ def main():
     for epoch in range(start_epoch, args.epochs + 1):
         train_loss = train_one_epoch(model, criterion, train_loader, optimizer, scheduler, device, grad_accum=args.grad_accum)
         if ema is not None:
-            ema.update(model)
+            ema.update(model, epoch)
         val_loss = evaluate_loss(model, criterion, val_loader, device)
         val_metrics = evaluate_retrieval(model, val_loader, device)
         val_r1 = val_metrics["t2i_R@1"]
@@ -416,7 +430,7 @@ def main():
         )
 
     final_model = model
-    if ema is not None:
+    if ema is not None and ema.initialized:
         ema_model = ema.shadow.to(device)
         ema_test_metrics = evaluate_retrieval(ema_model, test_loader, device)
         ema_metric_text = " ".join([f"{name}={value * 100:.2f}" for name, value in ema_test_metrics.items()])

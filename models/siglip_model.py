@@ -36,13 +36,15 @@ class SigLIPModel(nn.Module):
         num_heads: int = 4,
         num_layers: int = 2,
         text_dropout: float = 0.1,
+        proj_head: str = "linear",
     ):
         super().__init__()
-        self.image_encoder = ResNet18(width=image_width, output_dim=embed_dim)
+        self.image_encoder = ResNet18(width=image_width, output_dim=embed_dim, proj_head=proj_head)
         if text_encoder == "transformer":
             self.text_encoder = TransformerTextEncoder(
                 vocab_size, embed_dim=embed_dim, num_heads=num_heads,
                 num_layers=num_layers, max_len=max_len, dropout=text_dropout,
+                proj_head=proj_head,
             )
         elif text_encoder == "mlp":
             self.text_encoder = MLPTextEncoder(vocab_size, embed_dim=embed_dim)
