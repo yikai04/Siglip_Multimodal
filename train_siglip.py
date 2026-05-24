@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument("--text-dropout", type=float, default=0.1, help="Dropout rate in Transformer text encoder.")
     parser.add_argument("--proj-head", choices=["linear", "mlp"], default="linear", help="Projection head type: linear or 2-layer MLP.")
     parser.add_argument("--augment", choices=["default", "randaugment", "trivialaugment"], default="default", help="Training augmentation strategy.")
+    parser.add_argument("--cj-strength", type=float, default=0.2, help="ColorJitter strength (brightness/contrast/saturation). Hue is half this value.")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--grad-accum", type=int, default=1, help="Gradient accumulation steps. Effective batch = batch_size * grad_accum.")
     parser.add_argument("--epochs", type=int, default=30)
@@ -72,7 +73,7 @@ def build_dataloaders(args):
             image_root=image_root,
             captions_file=os.path.join(args.data_dir, "train_captions.txt"),
             tokenizer=tokenizer,
-            transform=build_transform(args.image_size, train=True, augment=args.augment),
+            transform=build_transform(args.image_size, train=True, augment=args.augment, cj_strength=args.cj_strength),
         )
         val_dataset = Flickr8kDataset(
             image_root=image_root,
@@ -362,7 +363,7 @@ def main():
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
-    total_steps = args.epochs * len(train_loader)
+    total_steps = args.epochs * (len(train_loader) // args.grad_accum)
     warmup_steps = args.warmup_steps if args.warmup_steps > 0 else int(args.warmup_ratio * total_steps)
     warmup_steps = min(warmup_steps, total_steps)
     scheduler = CosineWarmupScheduler(optimizer, warmup_steps, total_steps, args.lr, args.min_lr_ratio)
