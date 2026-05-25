@@ -1,5 +1,7 @@
 """SigLIP model with frozen pretrained HuggingFace ViT vision encoder."""
 
+import os
+
 import torch
 import torch.nn as nn
 from transformers import SiglipVisionModel, SiglipVisionConfig
@@ -26,9 +28,14 @@ class SigLIPPretrainedModel(nn.Module):
         super().__init__()
 
         # Frozen pretrained ViT vision encoder
-        self.vision_model = SiglipVisionModel.from_pretrained(
-            "google/siglip-base-patch16-224"
-        )
+        # Try local path first (for servers without internet), then HuggingFace hub
+        local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pretrained_vit")
+        if os.path.isdir(local_path) and os.path.isfile(os.path.join(local_path, "config.json")):
+            self.vision_model = SiglipVisionModel.from_pretrained(local_path)
+        else:
+            self.vision_model = SiglipVisionModel.from_pretrained(
+                "google/siglip-base-patch16-224"
+            )
         # Freeze all vision parameters
         for p in self.vision_model.parameters():
             p.requires_grad = False
