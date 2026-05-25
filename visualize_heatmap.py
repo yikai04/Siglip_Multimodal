@@ -2,24 +2,33 @@
 Zero-shot 跨模态相似度矩阵热力图
 =================================
 使用 HuggingFace 预训练的 google/siglip-base-patch16-224 模型，
-从 Flickr8k 测试集随机抽取 N 对图文，计算交叉余弦相似度矩阵，
-并应用 SigLIP 的缩放逻辑 logits = t * cos_sim + b，绘制 Logits 热力图。
+或本地训练的 SigLIP 模型，从 Flickr8k 测试集随机抽取 N 对图文，
+计算交叉余弦相似度矩阵，并应用 SigLIP 的缩放逻辑 logits = t * cos_sim + b，
+绘制 Logits 热力图。
 
 用法：
-  # 默认 10 对图文，输出到 viz_outputs/
-  python visualize_heatmap.py
+  # 方式一：使用 HuggingFace 预训练模型（需要网络下载）
+  python visualize_heatmap.py --pretrained
+
+  # 方式二：使用本地训练的模型（无需网络）
+  python visualize_heatmap.py \
+      --checkpoint outputs/exp11_wd005/best_siglip.pt \
+      --data-dir Flickr8k
 
   # 指定参数
   python visualize_heatmap.py \
+      --checkpoint outputs/exp11_wd005/best_siglip.pt \
+      --data-dir Flickr8k \
       --n-pairs 8 \
       --output viz_outputs/siglip_logits_heatmap.png \
       --seed 42
 
   # 只画原始余弦相似度（不缩放）
-  python visualize_heatmap.py --no-scale
+  python visualize_heatmap.py --checkpoint ... --no-scale
 """
 
 import argparse
+import csv
 import os
 import random
 
@@ -31,6 +40,7 @@ import seaborn as sns
 import torch
 import torch.nn.functional as F
 from PIL import Image
+from torchvision import transforms
 
 # ── Matplotlib 全局设置 ─────────────────────────────────────────────
 plt.rcParams.update({
@@ -44,7 +54,89 @@ plt.rcParams.update({
 })
 
 
-def load_siglip_pretrained(device="cuda"):
+# ═══════════════════════════════════════════════════════════════════
+#  本地模型加载
+# ═══════════════════════════════════════════════════════════════════
+
+def load_local_model(checkpoint_path, device):
+    """从本地 checkpoint 加载训练好的 SigLIP 模型。"""
+    from models import SigLIPModel
+    from utils import SimpleTokenizer, read_caption_file
+    from loss import SigLIPLoss
+
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    args_dict = ckpt.get("args", {})
+
+    class _Args:
+        pass
+    args = _Args()
+    for k, v in args_dict.items():
+        setattr(args, k, v)
+
+    all_rows = read_caption_file(os.path.join(args.data_dir, "captions.txt"))
+    tokenizer = SimpleTokenizer(
+        (row["caption"] for row in all_rows),
+        min_freq=getattr(args, "min_freq", 2),
+        max_len=getattr(args, "max_len", 32),
+    )
+    w2i = ckpt.get("tokenizer_word2idx")
+    if w2i:
+        tokenizer.word2idx = dict(w2i)
+        tokenizer.idx2word = [""] * len(tokenizer.word2idx)
+        for w, idx in tokenizer.word2idx.items():
+            tokenizer.idx2word[idx] = w
+
+    model = SigLIPModel(
+        vocab_size=len(tokenizer),
+        embed_dim=getattr(args, "embed_dim", 256),
+        image_width=getattr(args, "image_width", 32),
+        text_encoder=getattr(args, "text_encoder", "transformer"),
+        max_len=getattr(args, "max_len", 32),
+        num_heads=getattr(args, "num_heads", 4),
+        num_layers=getattr(args, "num_layers", 2),
+        text_dropout=getattr(args, "text_dropout", 0.1),
+        proj_head=getattr(args, "proj_head", "linear"),
+    ).to(device)
+    model.load_state_dict(ckpt["model"])
+    model.eval()
+
+    criterion = SigLIPLoss().to(device)
+    if "criterion" in ckpt:
+        criterion.load_state_dict(ckpt["criterion"])
+
+    img_transform = transforms.Compose([
+        transforms.Resize((getattr(args, "image_size", 224),
+                           getattr(args, "image_size", 224))),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    ])
+
+    return model, tokenizer, criterion, img_transform
+
+
+@torch.no_grad()
+def encode_local(model, tokenizer, criterion, img_transform, images, captions, device):
+    """用本地模型提取图文特征。"""
+    img_embeds, txt_embeds = [], []
+    for img, cap in zip(images, captions):
+        img_t = img_transform(img).unsqueeze(0).to(device)
+        ids_t = torch.tensor([tokenizer.encode(cap)], dtype=torch.long).to(device)
+        ie, te = model(img_t, ids_t)
+        img_embeds.append(ie)
+        txt_embeds.append(te)
+
+    img_embeds = F.normalize(torch.cat(img_embeds), dim=-1)
+    txt_embeds = F.normalize(torch.cat(txt_embeds), dim=-1)
+    logit_scale = criterion.logit_scale.exp().item()
+    logit_bias = criterion.logit_bias.item()
+    return img_embeds, txt_embeds, logit_scale, logit_bias
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  HuggingFace 预训练模型加载
+# ═══════════════════════════════════════════════════════════════════
+
+def load_pretrained_model(device="cuda"):
     """加载 HuggingFace 预训练 SigLIP 模型。"""
     from transformers import AutoModel, AutoProcessor
 
@@ -55,18 +147,49 @@ def load_siglip_pretrained(device="cuda"):
     return model, processor
 
 
+@torch.no_grad()
+def encode_pretrained(model, processor, images, captions, device, batch_size=16):
+    """用预训练 SigLIP 提取图文特征。"""
+    all_img_embeds, all_txt_embeds = [], []
+
+    for i in range(0, len(images), batch_size):
+        batch_imgs = images[i:i + batch_size]
+        inputs = processor(images=batch_imgs, return_tensors="pt", padding=True).to(device)
+        img_out = model.vision_model(**{k: v for k, v in inputs.items() if k.startswith("pixel")})
+        img_emb = img_out.pooler_output if hasattr(img_out, "pooler_output") else img_out.last_hidden_state[:, 0, :]
+        if hasattr(model, "visual_projection"):
+            img_emb = model.visual_projection(img_emb)
+        img_emb = F.normalize(img_emb, dim=-1)
+        all_img_embeds.append(img_emb)
+
+    for i in range(0, len(captions), batch_size):
+        batch_txts = captions[i:i + batch_size]
+        inputs = processor(text=batch_txts, return_tensors="pt", padding="max_length",
+                           truncation=True, max_length=64).to(device)
+        txt_out = model.text_model(**inputs)
+        txt_emb = txt_out.pooler_output if (hasattr(txt_out, "pooler_output") and txt_out.pooler_output is not None) else txt_out.last_hidden_state[:, 0, :]
+        if hasattr(model, "text_projection"):
+            txt_emb = model.text_projection(txt_emb)
+        txt_emb = F.normalize(txt_emb, dim=-1)
+        all_txt_embeds.append(txt_emb)
+
+    img_embeds = torch.cat(all_img_embeds)
+    txt_embeds = torch.cat(all_txt_embeds)
+
+    logit_scale = model.logit_scale.item()
+    logit_bias = model.logit_bias.item()
+    return img_embeds, txt_embeds, np.exp(logit_scale), logit_bias
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  数据加载
+# ═══════════════════════════════════════════════════════════════════
+
 def load_flickr8k_test(data_dir="Flickr8k", max_samples=None, seed=42):
-    """从 Flickr8k 测试集加载图文对。
-
-    Returns:
-        images:  List[PIL.Image]
-        captions: List[str]
-        img_ids:  List[str]
-    """
-    import csv
-
+    """从 Flickr8k 测试集加载图文对，每张图只取一个 caption。"""
     test_file = os.path.join(data_dir, "test_captions.txt")
-    image_root = os.path.join(data_dir, "Images")
+    img_dir = "Images" if os.path.isdir(os.path.join(data_dir, "Images")) else "images"
+    image_root = os.path.join(data_dir, img_dir)
 
     rows = []
     with open(test_file, "r", encoding="utf-8") as f:
@@ -79,7 +202,6 @@ def load_flickr8k_test(data_dir="Flickr8k", max_samples=None, seed=42):
             if img_id and caption:
                 rows.append({"image_id": img_id, "caption": caption})
 
-    # 按 image_id 去重：每张图只取第一个 caption（保证 N 对不重复图）
     seen = set()
     unique_rows = []
     for r in rows:
@@ -106,82 +228,38 @@ def load_flickr8k_test(data_dir="Flickr8k", max_samples=None, seed=42):
     return images, captions, img_ids
 
 
-@torch.no_grad()
-def compute_embeddings(model, processor, images, captions, device, batch_size=16):
-    """用预训练 SigLIP 提取图文特征。"""
-    all_img_embeds, all_txt_embeds = [], []
-
-    # 图像 embedding
-    for i in range(0, len(images), batch_size):
-        batch_imgs = images[i:i + batch_size]
-        inputs = processor(images=batch_imgs, return_tensors="pt", padding=True).to(device)
-        img_out = model.vision_model(**{k: v for k, v in inputs.items() if k.startswith("pixel")})
-        img_emb = img_out.pooler_output if hasattr(img_out, "pooler_output") else img_out.last_hidden_state[:, 0, :]
-        if hasattr(model, "visual_projection"):
-            img_emb = model.visual_projection(img_emb)
-        img_emb = F.normalize(img_emb, dim=-1)
-        all_img_embeds.append(img_emb)
-
-    # 文本 embedding
-    for i in range(0, len(captions), batch_size):
-        batch_txts = captions[i:i + batch_size]
-        inputs = processor(text=batch_txts, return_tensors="pt", padding="max_length",
-                           truncation=True, max_length=64).to(device)
-        txt_out = model.text_model(**inputs)
-        txt_emb = txt_out.pooler_output if hasattr(txt_out, "pooler_output") and txt_out.pooler_output is not None else txt_out.last_hidden_state[:, 0, :]
-        if hasattr(model, "text_projection"):
-            txt_emb = model.text_projection(txt_emb)
-        txt_emb = F.normalize(txt_emb, dim=-1)
-        all_txt_embeds.append(txt_emb)
-
-    img_embeds = torch.cat(all_img_embeds)
-    txt_embeds = torch.cat(all_txt_embeds)
-    return img_embeds, txt_embeds
-
+# ═══════════════════════════════════════════════════════════════════
+#  绘图
+# ═══════════════════════════════════════════════════════════════════
 
 def truncate_caption(text, max_len=35):
-    """截断过长文本，用于轴标签。"""
     if len(text) > max_len:
         return text[:max_len - 1] + "…"
     return text
 
 
 def plot_heatmap(matrix, captions, img_ids, logit_scale, logit_bias,
-                 use_siglip_scale=True, save_path=None):
-    """绘制 SigLIP Logits 或余弦相似度热力图。
-
-    Args:
-        matrix: [N_text, N_img] 的 numpy 数组
-        captions: 文本列表
-        img_ids: 图像 ID 列表
-        logit_scale: float, temperature 参数的标量值
-        logit_bias: float, bias 参数的标量值
-        use_siglip_scale: 是否应用 SigLIP 缩放
-        save_path: 保存路径
-    """
+                 use_siglip_scale=True, save_path=None, model_source="local"):
+    """绘制 SigLIP Logits 或余弦相似度热力图。"""
     n = matrix.shape[0]
 
-    # 准备标签
     x_labels = [f"Img {i}" for i in range(n)]
     y_labels = [truncate_caption(cap, 40) for cap in captions]
 
-    # 选 colormap：对角线（正值）vs 非对角线（负值）需要强烈对比
     if use_siglip_scale:
         cmap = "RdYlBu_r"
         fmt = ".2f"
-        cbar_label = "Logits  (t·cos_sim + b)"
-        title = (f"SigLIP Zero-shot Logits Matrix\n"
-                 f"t = exp({logit_scale:.2f}) = {np.exp(logit_scale):.2f},  "
-                 f"b = {logit_bias:.2f}")
+        cbar_label = "Logits  (t · cos_sim + b)"
+        title = (f"SigLIP Logits Matrix ({model_source})\n"
+                 f"t = {logit_scale:.2f},  b = {logit_bias:.2f}")
     else:
         cmap = "coolwarm"
         fmt = ".3f"
         cbar_label = "Cosine Similarity"
-        title = "Cosine Similarity Matrix (pre-SigLIP scaling)"
+        title = f"Cosine Similarity Matrix ({model_source})"
 
-    fig, ax = plt.subplots(figsize=(max(10, n * 1.3), max(8, n * 0.9)))
+    fig, ax = plt.subplots(figsize=(max(10, n * 1.4), max(8, n * 0.95)))
 
-    # 设置 vmin/vmax 让对角线和非对角线对比强烈
     if use_siglip_scale:
         diag_vals = np.diag(matrix)
         offdiag = matrix[~np.eye(n, dtype=bool)]
@@ -208,7 +286,7 @@ def plot_heatmap(matrix, captions, img_ids, logit_scale, logit_bias,
         square=True,
     )
 
-    # 对角线高亮：添加绿色边框
+    # 对角线高亮
     for i in range(n):
         ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False,
                                     edgecolor="#2ecc71", linewidth=2.5))
@@ -217,11 +295,9 @@ def plot_heatmap(matrix, captions, img_ids, logit_scale, logit_bias,
     ax.set_ylabel("Text Caption", fontsize=13, fontweight="bold", labelpad=10)
     ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
 
-    # Y 轴标签左对齐
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right", fontsize=9)
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=10)
 
-    # 统计注释
     diag_mean = np.diag(matrix).mean()
     offdiag_mean = matrix[~np.eye(n, dtype=bool)].mean()
     diag_min = np.diag(matrix).min()
@@ -244,23 +320,40 @@ def plot_heatmap(matrix, captions, img_ids, logit_scale, logit_bias,
     plt.close(fig)
 
 
+# ═══════════════════════════════════════════════════════════════════
+#  主函数
+# ═══════════════════════════════════════════════════════════════════
+
 def main():
-    parser = argparse.ArgumentParser(description="Zero-shot SigLIP Cross-modal Similarity Heatmap")
+    parser = argparse.ArgumentParser(description="SigLIP Cross-modal Similarity Heatmap")
     parser.add_argument("--data-dir", default="Flickr8k", help="Flickr8k root directory")
     parser.add_argument("--n-pairs", type=int, default=10, help="Number of image-text pairs to sample")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for sampling")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-scale", action="store_true",
                         help="Plot raw cosine similarity instead of SigLIP-scaled logits")
     parser.add_argument("--output", default="viz_outputs/siglip_logits_heatmap.png",
                         help="Output image path")
+
+    # 两种模式二选一
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument("--pretrained", action="store_true",
+                            help="Use HuggingFace pretrained google/siglip-base-patch16-224")
+    mode_group.add_argument("--checkpoint", default="",
+                            help="Path to local trained model checkpoint (best_siglip.pt)")
+
     parser.add_argument("--device", default="auto")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") \
         if args.device == "auto" else torch.device(args.device)
 
-    # 1. 加载预训练模型
-    model, processor = load_siglip_pretrained(device)
+    # 1. 加载模型
+    if args.pretrained:
+        model, processor = load_pretrained_model(device)
+        model_source = "Pretrained SigLIP"
+    else:
+        model, tokenizer, criterion, img_transform = load_local_model(args.checkpoint, device)
+        model_source = "Local Trained SigLIP"
 
     # 2. 加载测试集图文对
     print(f"Loading {args.n_pairs} image-text pairs from Flickr8k test set ...")
@@ -272,44 +365,40 @@ def main():
 
     # 3. 提取特征
     print("Computing embeddings ...")
-    img_embeds, txt_embeds = compute_embeddings(model, processor, images, captions, device)
+    if args.pretrained:
+        img_embeds, txt_embeds, logit_scale, logit_bias = encode_pretrained(
+            model, processor, images, captions, device
+        )
+    else:
+        img_embeds, txt_embeds, logit_scale, logit_bias = encode_local(
+            model, tokenizer, criterion, img_transform, images, captions, device
+        )
 
     # 4. 计算余弦相似度矩阵
     cos_sim = (txt_embeds @ img_embeds.T).cpu().numpy()  # [N_text, N_img]
 
-    # 5. 获取 SigLIP 可学习参数
-    logit_scale_val = model.logit_scale.item()
-    logit_bias_val = model.logit_bias.item()
-    t = np.exp(logit_scale_val)
-    b = logit_bias_val
-    print(f"  SigLIP params: t = exp({logit_scale_val:.4f}) = {t:.2f},  b = {b:.4f}")
+    # 5. 应用 SigLIP 缩放: logits = t * cos_sim + b
+    logits_matrix = logit_scale * cos_sim + logit_bias
+    print(f"  SigLIP params: t = {logit_scale:.2f},  b = {logit_bias:.4f}")
 
-    # 6. 应用 SigLIP 缩放: logits = t * cos_sim + b
-    logits_matrix = t * cos_sim + b
-
-    # 7. 绘制热力图
-    if args.no_scale:
-        plot_heatmap(
-            cos_sim, captions, img_ids,
-            logit_scale_val, logit_bias_val,
-            use_siglip_scale=False,
-            save_path=args.output.replace(".png", "_cosine.png"),
-        )
-    else:
+    # 6. 绘制热力图
+    if not args.no_scale:
         plot_heatmap(
             logits_matrix, captions, img_ids,
-            logit_scale_val, logit_bias_val,
+            logit_scale, logit_bias,
             use_siglip_scale=True,
             save_path=args.output,
+            model_source=model_source,
         )
 
-    # 同时保存一份余弦相似度的
+    # 同时保存余弦相似度版本
     cos_output = args.output.replace(".png", "_cosine.png")
     plot_heatmap(
         cos_sim, captions, img_ids,
-        logit_scale_val, logit_bias_val,
+        logit_scale, logit_bias,
         use_siglip_scale=False,
         save_path=cos_output,
+        model_source=model_source,
     )
 
     print("\nDone!")

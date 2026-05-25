@@ -106,8 +106,9 @@ def load_model_and_tokenizer(checkpoint_path, device):
 
 def build_test_dataset(data_dir, tokenizer, image_size=224):
     """构建测试集 Dataset。"""
+    img_dir = "Images" if os.path.isdir(os.path.join(data_dir, "Images")) else "images"
     return Flickr8kDataset(
-        image_root=os.path.join(data_dir, "Images"),
+        image_root=os.path.join(data_dir, img_dir),
         captions_file=os.path.join(data_dir, "test_captions.txt"),
         tokenizer=tokenizer,
         transform=build_transform(image_size, train=False),
@@ -159,7 +160,7 @@ def retrieve_topk_for_text(query_caption, model, tokenizer, unique_img_embeds,
                            unique_img_ids, device, topk=5):
     """给定一段文本，检索 Top-K 最相似的图像。"""
     input_ids = torch.tensor([tokenizer.encode(query_caption)], dtype=torch.long).to(device)
-    _, txt_emb = model(torch.zeros(1, 3, 224, 224).to(device), input_ids)
+    txt_emb = model.text_encoder(input_ids)
     txt_emb = F.normalize(txt_emb, dim=-1)
 
     scores = (txt_emb @ unique_img_embeds.T).squeeze(0)
@@ -188,7 +189,7 @@ def plot_topk_results(query_caption, results, image_root, gt_image_id=None,
         title_prefix: 标题前缀
     """
     n = len(results)
-    fig, axes = plt.subplots(1, n, figsize=(3.5 * n, 4.5))
+    fig, axes = plt.subplots(1, n, figsize=(5 * n, 8))
     if n == 1:
         axes = [axes]
 
@@ -214,7 +215,7 @@ def plot_topk_results(query_caption, results, image_root, gt_image_id=None,
         if is_gt:
             label += "  [GT]"
         ax.set_title(f"{label}\nscore = {r['score']:.4f}",
-                     fontsize=10,
+                     fontsize=16,
                      color="#2ecc71" if is_gt else "#333333",
                      fontweight="bold" if is_gt else "normal")
         ax.axis("off")
@@ -222,7 +223,7 @@ def plot_topk_results(query_caption, results, image_root, gt_image_id=None,
     main_title = f"{title_prefix}{query_caption}"
     if len(main_title) > 80:
         main_title = main_title[:77] + "..."
-    fig.suptitle(main_title, fontsize=13, fontweight="bold", y=1.02, wrap=True)
+    fig.suptitle(main_title, fontsize=16, fontweight="bold", y=0.98, wrap=True)
 
     legend_elements = []
     if gt_image_id:
@@ -236,7 +237,7 @@ def plot_topk_results(query_caption, results, image_root, gt_image_id=None,
 
     if save_path:
         os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
-        fig.savefig(save_path, bbox_inches="tight")
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
         print(f"[Saved] {save_path}")
     plt.close(fig)
 
@@ -302,7 +303,9 @@ def main():
     model, tokenizer, ckpt_args = load_model_and_tokenizer(args.checkpoint, device)
 
     image_size = getattr(ckpt_args, "image_size", 224)
-    image_root = os.path.join(args.data_dir, "Images")
+    # 兼容大小写目录名
+    img_dir = "Images" if os.path.isdir(os.path.join(args.data_dir, "Images")) else "images"
+    image_root = os.path.join(args.data_dir, img_dir)
 
     print("Building test dataset & computing embeddings ...")
     dataset = build_test_dataset(args.data_dir, tokenizer, image_size)
