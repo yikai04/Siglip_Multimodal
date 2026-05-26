@@ -7,6 +7,7 @@ outputs/**/*.zip
 
 # Pretrained model weights (large)
 pretrained_vit/
+pretrained_distilbert/
 
 # Python cache
 __pycache__/

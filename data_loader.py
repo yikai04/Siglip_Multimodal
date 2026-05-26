@@ -50,6 +50,24 @@ def build_transform(image_size: int = 224, train: bool = True, augment: str = "d
     )
 
 
+def build_siglip_transform(image_size: int = 224, train: bool = True):
+    """Transform matching SigLIP ViT preprocessing: BICUBIC resize + SigLIP normalization."""
+    SIGLIP_MEAN = [0.5, 0.5, 0.5]
+    SIGLIP_STD = [0.5, 0.5, 0.5]
+    if train:
+        return T.Compose([
+            T.Resize((image_size, image_size), interpolation=T.InterpolationMode.BICUBIC),
+            T.RandomHorizontalFlip(p=0.5),
+            T.ToTensor(),
+            T.Normalize(mean=SIGLIP_MEAN, std=SIGLIP_STD),
+        ])
+    return T.Compose([
+        T.Resize((image_size, image_size), interpolation=T.InterpolationMode.BICUBIC),
+        T.ToTensor(),
+        T.Normalize(mean=SIGLIP_MEAN, std=SIGLIP_STD),
+    ])
+
+
 class Flickr8kDataset(Dataset):
     def __init__(self, image_root: str, captions_file: str, tokenizer, transform=None):
         self.image_root = image_root
@@ -69,6 +87,40 @@ class Flickr8kDataset(Dataset):
         return {
             "image": image,
             "input_ids": input_ids,
+            "image_id": row["image_id"],
+            "caption": row["caption"],
+        }
+
+
+class Flickr8kDistilBERTDataset(Dataset):
+    """Flickr8k dataset variant using DistilBertTokenizerFast with attention_mask."""
+
+    def __init__(self, image_root: str, captions_file: str, tokenizer, transform=None, max_len: int = 64):
+        self.image_root = image_root
+        self.tokenizer = tokenizer  # DistilBertTokenizerFast
+        self.transform = transform or build_siglip_transform(train=True)
+        self.max_len = max_len
+        self.rows = read_caption_file(captions_file)
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, idx):
+        row = self.rows[idx]
+        image_path = os.path.join(self.image_root, row["image_id"])
+        image = Image.open(image_path).convert("RGB")
+        image = self.transform(image)
+        encoded = self.tokenizer(
+            row["caption"],
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_len,
+            return_tensors="pt",
+        )
+        return {
+            "image": image,
+            "input_ids": encoded["input_ids"].squeeze(0),
+            "attention_mask": encoded["attention_mask"].squeeze(0),
             "image_id": row["image_id"],
             "caption": row["caption"],
         }
