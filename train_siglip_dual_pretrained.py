@@ -228,6 +228,8 @@ def main():
         text_proj_type=args.text_proj_type,
     ).to(device)
 
+    criterion = SigLIPLoss().to(device)
+
     # Parameter groups for differential learning rates
     vit_unfrozen_params = []
     for i in range(model.freeze_until, len(model.vision_model.encoder.layers)):
@@ -248,7 +250,6 @@ def main():
     print(f"Trainable: {total_trainable:,} (ViT top={vit_trainable:,}, DistilBERT={db_trainable:,}, proj={proj_trainable:,}, loss=2)")
     print(f"Frozen: {total_params - total_trainable:,}")
 
-    criterion = SigLIPLoss().to(device)
     optimizer = torch.optim.AdamW([
         {"params": vit_unfrozen_params, "lr": args.vit_lr, "weight_decay": args.vit_wd},
         {"params": distilbert_params, "lr": args.distilbert_lr, "weight_decay": args.distilbert_wd},
