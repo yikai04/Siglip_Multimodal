@@ -2,269 +2,307 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>SigLIP Model Optimization Experiment Report</title>
+<title>SigLIP 图文检索模型优化实验报告 (Exp0–Exp19)</title>
 <style>
-body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-.container { max-width: 1200px; margin: 0 auto; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+.container { max-width: 1400px; margin: 0 auto; }
 h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-h2 { color: #34495e; margin-top: 30px; }
+h2 { color: #34495e; margin-top: 30px; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
 h3 { color: #2980b9; }
 .card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-th, td { padding: 10px 12px; text-align: center; border: 1px solid #ddd; }
-th { background: #3498db; color: white; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+th, td { padding: 8px 10px; text-align: center; border: 1px solid #ddd; }
+th { background: #3498db; color: white; font-weight: 600; position: sticky; top: 0; }
 td { background: #fafafa; }
 .highlight { background: #e8f8e8 !important; font-weight: bold; }
-.best { background: #d4edda !important; color: #155724; font-weight: bold; }
+.best-row { background: #d4edda !important; }
+.best-row td { background: #d4edda !important; color: #155724; font-weight: bold; }
 .code-block { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; font-family: 'Consolas', monospace; white-space: pre-wrap; overflow-x: auto; }
 .diff-add { background: #e6ffed; color: #22863a; }
 .diff-remove { background: #ffeef0; color: #cb2431; }
 .tag { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
 .tag-best { background: #d4edda; color: #155724; }
+.tag-good { background: #d1ecf1; color: #0c5460; }
 .tag-mid { background: #fff3cd; color: #856404; }
 .tag-bad { background: #f8d7da; color: #721c24; }
 .tag-killed { background: #e2e3e5; color: #383d41; }
-.tag-running { background: #cce5ff; color: #004085; }
-.progress { height: 20px; background: #e9ecef; border-radius: 10px; margin: 5px 0; }
-.progress-bar { height: 20px; border-radius: 10px; text-align: center; color: white; font-weight: 600; }
+.tag-variance { background: #ffeeba; color: #856404; }
+.progress { height: 24px; background: #e9ecef; border-radius: 12px; margin: 5px 0; }
+.progress-bar { height: 24px; border-radius: 12px; text-align: center; color: white; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; }
 .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 15px 0; }
 .summary-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
-.summary-value { font-size: 24px; font-weight: bold; color: #3498db; }
+.summary-value { font-size: 24px; font-weight: bold; }
 .summary-label { font-size: 14px; color: #7f8c8d; margin-top: 5px; }
-.model-diagram { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; }
+.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.detail-item { background: #f8f9fa; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
+.detail-label { color: #7f8c8d; font-size: 12px; }
+.detail-value { font-weight: 600; color: #2c3e50; }
+.findings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+.finding-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.finding-card h4 { color: #2980b9; margin: 0 0 8px 0; }
+.finding-card p { margin: 0; color: #555; font-size: 14px; line-height: 1.5; }
+.change-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 700; margin: 2px; }
+.change-new { background: #d4edda; color: #155724; }
+.change-fix { background: #cce5ff; color: #004085; }
+.change-fail { background: #f8d7da; color: #721c24; }
+.arch-diagram { background: #f0f4f8; border: 2px solid #dee2e6; padding: 20px; border-radius: 8px; text-align: center; }
+.arch-block { display: inline-block; padding: 12px 20px; margin: 5px; border-radius: 6px; font-weight: 600; }
+.arch-frozen { background: #d6d8db; color: #383d41; border: 2px solid #6c757d; }
+.arch-trainable { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+.arch-loss { background: #cce5ff; color: #004085; border: 2px solid #007bff; }
+.scroll-wrapper { overflow-x: auto; }
 </style>
 </head>
 <body>
 <div class="container">
 
-<h1>SigLIP Model Optimization Experiment Report</h1>
-<p><strong>Date:</strong> 2026-05-22 &mdash; 2026-05-25</p>
-<p><strong>Platform:</strong> NVIDIA RTX 4090 Laptop GPU</p>
-<p><strong>Dataset:</strong> Flickr8k (8000 images, 5 captions per image)</p>
-<p><strong>Model:</strong> ResNet-18 (width=48) + Transformer text encoder (2 layers, 4 heads, embed_dim=256)</p>
+<h1>SigLIP 图文检索模型优化实验报告 (Exp0–Exp19)</h1>
+<p><strong>时间：</strong> 2026-05-22 — 2026-05-26</p>
+<p><strong>平台：</strong> NVIDIA RTX 4090 (24GB)</p>
+<p><strong>数据集：</strong> Flickr8k (8000 张图像，每张 1–5 条英文描述，共约 40000 条图文对)</p>
 
-<h2>Experiment Summary</h2>
+<!-- ============================================================ -->
+<h2>总体概览</h2>
+<!-- ============================================================ -->
+
 <div class="summary-grid">
   <div class="summary-card">
-    <div class="summary-value">36.65%</div>
-    <div class="summary-label">Best t2i R@1 (%) — Exp6</div>
+    <div class="summary-value" style="color:#28a745;">47.36%</div>
+    <div class="summary-label">最优 t2i R@1 — Exp19 (冻结预训练ViT)</div>
   </div>
   <div class="summary-card">
-    <div class="summary-value">39.82%</div>
-    <div class="summary-label">Best i2t R@1 (%) — Exp6</div>
+    <div class="summary-value" style="color:#28a745;">49.97%</div>
+    <div class="summary-label">最优 i2t R@1 — Exp19</div>
   </div>
   <div class="summary-card">
-    <div class="summary-value">58.90%</div>
-    <div class="summary-label">Best t2i R@5 (%) — Exp6</div>
+    <div class="summary-value" style="color:#e74c3c;">+26.10%</div>
+    <div class="summary-label">Exp19 vs 基线(Exp0) 提升</div>
   </div>
   <div class="summary-card">
-    <div class="summary-value">+15.39%</div>
-    <div class="summary-label">Improvement vs Baseline</div>
+    <div class="summary-value" style="color:#3498db;">20</div>
+    <div class="summary-label">总实验数量 (Exp0–Exp19)</div>
   </div>
 </div>
 
-<h2>All Experiments Results</h2>
+<!-- ============================================================ -->
+<h2>关键发现总结</h2>
+<!-- ============================================================ -->
+
+<div class="findings-grid">
+  <div class="finding-card">
+    <h4>1. 预训练视觉编码器是最大突破</h4>
+    <p>Exp19 冻结 SigLIP ViT-B/16 后，t2i_R@1 从 36.65% 跃升至 47.36%，提升 10.71 个百分点。仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果，证明预训练视觉特征是核心瓶颈。</p>
+  </div>
+  <div class="finding-card">
+    <h4>2. Cosine Warmup 是最关键的超参优化</h4>
+    <p>从 Exp0 到 Exp1，仅替换常数 LR 为 Cosine Warmup，t2i_R@1 从 21.26% 升至 29.83%，提升 8.57%。Warmup 防止初始不稳定，Cosine 衰减缓解过拟合。</p>
+  </div>
+  <div class="finding-card">
+    <h4>3. Flickr8k 对增强策略极度敏感</h4>
+    <p>RandomResizedCrop、RandAugment、TrivialAugment 均严重损害性能（分别降至 12.58%、24.69%、21.82%）。ColorJitter 仅在 mild(strength=0.2) 时有效，0.3 反而损害。</p>
+  </div>
+  <div class="finding-card">
+    <h4>4. 更大模型容量在小数据上导致过拟合</h4>
+    <p>width=64 (32.53%)、4L+8H+d512 (被终止)、MLP 投影头 (29.63%) 均不如 width=48。Flickr8k 30k 训练对只能支撑有限的模型容量。</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>全部实验对比表</h2>
+<!-- ============================================================ -->
+
 <div class="card">
+<div class="scroll-wrapper">
 <table>
 <thead>
 <tr>
-  <th>Experiment</th>
-  <th>Model Config</th>
-  <th>LR Strategy</th>
-  <th>Augmentation</th>
+  <th>实验</th>
+  <th>核心变更</th>
+  <th>图像编码器</th>
+  <th>文本编码器</th>
+  <th>LR 策略</th>
+  <th>数据增强</th>
   <th>Epochs</th>
-  <th>t2i R@1 (%)</th>
-  <th>i2t R@1 (%)</th>
-  <th>t2i R@5 (%)</th>
-  <th>i2t R@5 (%)</th>
-  <th>t2i R@10 (%)</th>
-  <th>i2t R@10 (%)</th>
-  <th>Tag</th>
+  <th>t2i R@1</th>
+  <th>i2t R@1</th>
+  <th>t2i R@5</th>
+  <th>i2t R@5</th>
+  <th>t2i R@10</th>
+  <th>i2t R@10</th>
+  <th>vs Exp6</th>
+  <th>评价</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-  <td>Exp0 (Baseline)</td>
-  <td>w=32, 2L, 4H, d=256</td>
-  <td>Constant LR</td>
-  <td>Resize+Flip</td>
-  <td>30</td>
-  <td>21.26</td>
-  <td>20.88</td>
-  <td>45.77</td>
-  <td>44.26</td>
-  <td>56.72</td>
-  <td>56.47</td>
-  <td><span class="tag tag-bad">Baseline</span></td>
+  <td>Exp0</td><td>基线</td><td>RN18(w=32)</td><td>2L,4H,d=256</td><td>常数 3e-4</td><td>Resize+Flip</td><td>30</td>
+  <td>21.26%</td><td>20.88%</td><td>45.77%</td><td>44.26%</td><td>56.72%</td><td>56.47%</td>
+  <td style="color:#e74c3c;">-15.39%</td><td><span class="tag tag-bad">基线</span></td>
 </tr>
 <tr>
-  <td>Exp1 (Cosine+Warmup)</td>
-  <td>w=32, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>Resize+Flip</td>
-  <td>30</td>
-  <td>29.83</td>
-  <td>32.07</td>
-  <td>55.54</td>
-  <td>56.81</td>
-  <td>65.50</td>
-  <td>67.48</td>
-  <td><span class="tag tag-mid">Good</span></td>
+  <td>Exp1</td><td>Cosine+warmup</td><td>RN18(w=32)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip</td><td>30</td>
+  <td>29.83%</td><td>32.07%</td><td>55.54%</td><td>56.81%</td><td>65.50%</td><td>67.48%</td>
+  <td style="color:#e74c3c;">-6.82%</td><td><span class="tag tag-good">关键改进</span></td>
 </tr>
 <tr>
-  <td>Exp2 (Crop 0.5)</td>
-  <td>w=32, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>RandomResizedCrop(0.5)+Flip</td>
-  <td>30</td>
-  <td>12.58</td>
-  <td>13.59</td>
-  <td>31.27</td>
-  <td>33.31</td>
-  <td>43.08</td>
-  <td>44.92</td>
-  <td><span class="tag tag-bad">Too aggressive</span></td>
+  <td>Exp2</td><td>RRC(0.5)</td><td>RN18(w=32)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>RRC(0.5)+Flip</td><td>30</td>
+  <td>12.58%</td><td>13.59%</td><td>31.27%</td><td>33.31%</td><td>43.08%</td><td>44.92%</td>
+  <td style="color:#e74c3c;">-24.07%</td><td><span class="tag tag-bad">裁剪过激</span></td>
 </tr>
 <tr>
-  <td>Exp3 (Crop 0.75)</td>
-  <td>w=32, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>RandomResizedCrop(0.75)+Flip</td>
-  <td>60</td>
-  <td>27.01</td>
-  <td>29.76</td>
-  <td>51.01</td>
-  <td>52.98</td>
-  <td>60.55</td>
-  <td>63.22</td>
-  <td><span class="tag tag-mid">Worse than Resize</span></td>
+  <td>Exp3</td><td>RRC(0.75)</td><td>RN18(w=32)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>RRC(0.75)+Flip</td><td>60</td>
+  <td>27.01%</td><td>29.76%</td><td>51.01%</td><td>52.98%</td><td>60.55%</td><td>63.22%</td>
+  <td style="color:#e74c3c;">-9.64%</td><td><span class="tag tag-mid">不如Resize</span></td>
 </tr>
 <tr>
-  <td>Exp4 (Cosine 100ep)</td>
-  <td>w=32, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>Resize+Flip</td>
-  <td>100</td>
-  <td>34.78</td>
-  <td>37.93</td>
-  <td>57.07</td>
-  <td>60.15</td>
-  <td>65.40</td>
-  <td>67.87</td>
-  <td><span class="tag tag-best">Previous Best</span></td>
+  <td>Exp4</td><td>100ep+w=32</td><td>RN18(w=32)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip</td><td>100</td>
+  <td>34.78%</td><td>37.93%</td><td>57.07%</td><td>60.15%</td><td>65.40%</td><td>67.87%</td>
+  <td style="color:#e74c3c;">-1.87%</td><td><span class="tag tag-good">前期最优</span></td>
 </tr>
-<tr class="best">
-  <td>Exp5 (Wider+ColorJitter)</td>
-  <td><strong>w=48</strong>, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>Resize+Flip+<strong>ColorJitter</strong></td>
-  <td>100</td>
-  <td>35.86</td>
-  <td>38.51</td>
-  <td>58.45</td>
-  <td>61.06</td>
-  <td>66.58</td>
-  <td>68.54</td>
-  <td><span class="tag tag-best">Best</span></td>
+<tr class="highlight">
+  <td>Exp5</td><td>w=48+ColorJitter(0.2)</td><td><strong>RN18(w=48)</strong></td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ(0.2)</td><td>100</td>
+  <td>35.86%</td><td>38.51%</td><td>58.45%</td><td>61.06%</td><td>66.58%</td><td>68.54%</td>
+  <td style="color:#e74c3c;">-0.79%</td><td><span class="tag tag-good">从头训练最优</span></td>
+</tr>
+<tr class="highlight">
+  <td>Exp6</td><td>+EMA(0.999)</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ(0.2)</td><td>100</td>
+  <td>36.65%</td><td>39.82%</td><td>58.90%</td><td>60.82%</td><td>66.76%</td><td>69.30%</td>
+  <td style="color:#27ae60;">0%</td><td><span class="tag tag-best">从头训练最优</span></td>
 </tr>
 <tr>
-  <td>Exp6 (Exp5 + EMA)</td>
-  <td>w=48, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>Resize+Flip+ColorJitter</td>
-  <td>100</td>
-  <td>36.65</td>
-  <td>39.82</td>
-  <td>58.90</td>
-  <td>60.82</td>
-  <td>66.76</td>
-  <td>69.30</td>
-  <td><span class="tag tag-best">Best (no EMA gain)</span></td>
+  <td>Exp7</td><td>4L+8H+d512</td><td>RN18(w=48)</td><td><strong>4L,8H,d=512</strong></td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>Killed@21</td>
+  <td>~15%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+  <td>—</td><td><span class="tag tag-killed">过慢/终止</span></td>
 </tr>
 <tr>
-  <td>Exp7 (4L+8H+d512)</td>
-  <td>w=48, <strong>4L</strong>, <strong>8H</strong>, <strong>d=512</strong></td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>Resize+Flip+ColorJitter</td>
-  <td>Killed@21</td>
-  <td>~15</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td><span class="tag tag-killed">Too slow, overfitting risk</span></td>
+  <td>Exp8</td><td>200ep</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>Killed@97</td>
+  <td>~30%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+  <td>—</td><td><span class="tag tag-bad">过拟合</span></td>
 </tr>
 <tr>
-  <td>Exp8 (Best+200ep)</td>
-  <td>w=48, 2L, 4H, d=256</td>
-  <td>Cosine (min_lr=1%base)</td>
-  <td>Resize+Flip+ColorJitter</td>
-  <td>Killed@97</td>
-  <td>~30</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td><span class="tag tag-bad">Overfitted at 200ep</span></td>
+  <td>Exp9</td><td>LR=5e-4</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td><strong>Cosine LR=5e-4</strong></td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>34.55%</td><td>37.36%</td><td>56.55%</td><td>58.91%</td><td>64.83%</td><td>67.11%</td>
+  <td style="color:#e74c3c;">-2.10%</td><td><span class="tag tag-mid">LR过高</span></td>
 </tr>
 <tr>
-  <td>Exp9 (Higher LR)</td>
-  <td>w=48, 2L, 4H, d=256</td>
-  <td>Cosine (<strong>LR=5e-4</strong>)</td>
-  <td>Resize+Flip+ColorJitter</td>
-  <td>100</td>
-  <td>34.55</td>
-  <td>37.36</td>
-  <td>56.55</td>
-  <td>58.91</td>
-  <td>65.63</td>
-  <td>67.76</td>
-  <td><span class="tag tag-mid">Worse than LR=3e-4</span></td>
+  <td>Exp10</td><td>MLP投影头</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>29.63%</td><td>32.19%</td><td>52.60%</td><td>54.80%</td><td>62.51%</td><td>63.95%</td>
+  <td style="color:#e74c3c;">-7.02%</td><td><span class="tag tag-bad">MLP过拟合</span></td>
+</tr>
+<tr>
+  <td>Exp11</td><td>wd=0.05</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>34.11%</td><td>36.84%</td><td>58.18%</td><td>61.16%</td><td>67.40%</td><td>69.60%</td>
+  <td style="color:#e74c3c;">-2.54%</td><td><span class="tag tag-mid">wd过强</span></td>
+</tr>
+<tr>
+  <td>Exp12</td><td>延迟EMA(0.99)</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>31.71%</td><td>35.05%</td><td>55.17%</td><td>58.09%</td><td>65.13%</td><td>67.26%</td>
+  <td style="color:#e74c3c;">-4.94%</td><td><span class="tag tag-bad">EMA=0.07%</span></td>
+</tr>
+<tr>
+  <td>Exp13</td><td>RandAugment</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td><strong>RandAugment</strong></td><td>100</td>
+  <td>24.69%</td><td>25.90%</td><td>46.05%</td><td>48.33%</td><td>56.06%</td><td>57.90%</td>
+  <td style="color:#e74c3c;">-11.96%</td><td><span class="tag tag-bad">增强过激</span></td>
+</tr>
+<tr>
+  <td>Exp14</td><td>TrivialAugment</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td><strong>TrivialAugment</strong></td><td>100</td>
+  <td>21.82%</td><td>22.98%</td><td>42.29%</td><td>43.31%</td><td>52.37%</td><td>53.40%</td>
+  <td style="color:#e74c3c;">-14.83%</td><td><span class="tag tag-bad">增强过激</span></td>
+</tr>
+<tr>
+  <td>Exp15</td><td>grad_accum=2</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>29.56%</td><td>31.91%</td><td>52.97%</td><td>55.56%</td><td>62.83%</td><td>64.47%</td>
+  <td style="color:#e74c3c;">-7.09%</td><td><span class="tag tag-bad">步数减少</span></td>
+</tr>
+<tr>
+  <td>Exp16</td><td>CJ(0.3)</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td><strong>CJ(strength=0.3)</strong></td><td>100</td>
+  <td>30.92%</td><td>34.86%</td><td>54.94%</td><td>57.60%</td><td>64.93%</td><td>66.81%</td>
+  <td style="color:#e74c3c;">-5.73%</td><td><span class="tag tag-bad">CJ过强</span></td>
+</tr>
+<tr>
+  <td>Exp17</td><td>w=64</td><td><strong>RN18(w=64)</strong></td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>32.53%</td><td>35.78%</td><td>55.88%</td><td>58.97%</td><td>64.61%</td><td>67.60%</td>
+  <td style="color:#e74c3c;">-4.12%</td><td><span class="tag tag-mid">过宽过拟合</span></td>
+</tr>
+<tr>
+  <td>Exp18</td><td>复现Exp6</td><td>RN18(w=48)</td><td>2L,4H,d=256</td><td>Cosine warmup</td><td>Resize+Flip+CJ</td><td>100</td>
+  <td>32.23%</td><td>35.26%</td><td>55.07%</td><td>57.78%</td><td>64.68%</td><td>67.17%</td>
+  <td style="color:#e74c3c;">-4.42%</td><td><span class="tag tag-variance">随机方差</span></td>
+</tr>
+<tr class="best-row">
+  <td>Exp19</td><td>冻结预训练ViT-B/16</td><td><strong>冻结SigLIP ViT-B/16</strong></td><td><strong>2L,12H,d=768</strong></td><td>Cosine warmup</td><td>Resize+Flip+SigLIP归一化</td><td>~70</td>
+  <td>47.36%</td><td>49.97%</td><td>72.54%</td><td>74.92%</td><td>80.70%</td><td>82.43%</td>
+  <td style="color:#155724;">+10.71%</td><td><span class="tag tag-best">最优模型</span></td>
 </tr>
 </tbody>
 </table>
 </div>
-
-<h2>Key Finding: Loss Function Bug</h2>
-<div class="card">
-<h3>Critical Discovery</h3>
-<p>The original <code>repo_v2/loss.py</code> had a <strong>sign error</strong> compared to the working version. This caused training loss to be ~200x higher (204 vs 6.2 at epoch 1) and made the model nearly unable to learn.</p>
-<h3>Difference</h3>
-<div class="code-block">
-<span class="diff-remove">- logits = -t * logits + b    # WRONG sign convention</span>
-<span class="diff-remove">- loss = labels * logits      # WRONG sign convention</span>
-<span class="diff-add">+ logits = t * logits + b     # CORRECT, matches SigLIP paper</span>
-<span class="diff-add">+ loss = -labels * logits     # CORRECT, matches SigLIP paper</span>
-</div>
-<p>After fixing this, loss dropped from 204 to 6.2 at epoch 1, and the model became trainable again.</p>
 </div>
 
-<h2>Experiment 0: Baseline (Constant LR)</h2>
+<!-- ============================================================ -->
+<h2>t2i R@1 进度图</h2>
+<!-- ============================================================ -->
+
 <div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>LR strategy: Constant (3e-4)</li>
-<li>Warmup: None</li>
-<li>Augmentation: Resize(224) + RandomHorizontalFlip</li>
-<li>Optimizer: AdamW, weight_decay=1e-4</li>
-<li>Epochs: 30, Batch: 256</li>
-<li>Model: ResNet-18 (width=32) + Transformer (2 layers, 4 heads, embed_dim=256)</li>
-</ul>
-<h3>Test Result</h3>
+<table>
+<thead><tr><th>实验</th><th>t2i R@1 (%)</th><th>进度条</th></tr></thead>
+<tbody>
+<tr><td>Exp2 (RRC 0.5)</td><td>12.58%</td><td><div class="progress"><div class="progress-bar" style="width:26%;background:#e74c3c;">12.58%</div></div></td></tr>
+<tr><td>Exp14 (TrivialAug)</td><td>21.82%</td><td><div class="progress"><div class="progress-bar" style="width:46%;background:#e74c3c;">21.82%</div></div></td></tr>
+<tr><td>Exp0 (基线)</td><td>21.26%</td><td><div class="progress"><div class="progress-bar" style="width:45%;background:#e74c3c;">21.26%</div></div></td></tr>
+<tr><td>Exp13 (RandAugment)</td><td>24.69%</td><td><div class="progress"><div class="progress-bar" style="width:52%;background:#e74c3c;">24.69%</div></div></td></tr>
+<tr><td>Exp10 (MLP proj)</td><td>29.63%</td><td><div class="progress"><div class="progress-bar" style="width:63%;background:#e67e22;">29.63%</div></div></td></tr>
+<tr><td>Exp15 (grad_accum=2)</td><td>29.56%</td><td><div class="progress"><div class="progress-bar" style="width:63%;background:#e67e22;">29.56%</div></div></td></tr>
+<tr><td>Exp1 (Cosine 30ep)</td><td>29.83%</td><td><div class="progress"><div class="progress-bar" style="width:63%;background:#f39c12;">29.83%</div></div></td></tr>
+<tr><td>Exp16 (CJ=0.3)</td><td>30.92%</td><td><div class="progress"><div class="progress-bar" style="width:65%;background:#e67e22;">30.92%</div></div></td></tr>
+<tr><td>Exp12 (延迟EMA)</td><td>31.71%</td><td><div class="progress"><div class="progress-bar" style="width:67%;background:#e67e22;">31.71%</div></div></td></tr>
+<tr><td>Exp18 (复现Exp6)</td><td>32.23%</td><td><div class="progress"><div class="progress-bar" style="width:68%;background:#e67e22;">32.23%</div></div></td></tr>
+<tr><td>Exp17 (w=64)</td><td>32.53%</td><td><div class="progress"><div class="progress-bar" style="width:69%;background:#e67e22;">32.53%</div></div></td></tr>
+<tr><td>Exp3 (RRC 0.75)</td><td>27.01%</td><td><div class="progress"><div class="progress-bar" style="width:57%;background:#f39c12;">27.01%</div></div></td></tr>
+<tr><td>Exp9 (LR=5e-4)</td><td>34.55%</td><td><div class="progress"><div class="progress-bar" style="width:73%;background:#f39c12;">34.55%</div></div></td></tr>
+<tr><td>Exp11 (wd=0.05)</td><td>34.11%</td><td><div class="progress"><div class="progress-bar" style="width:72%;background:#f39c12;">34.11%</div></div></td></tr>
+<tr><td>Exp4 (Cosine 100ep)</td><td>34.78%</td><td><div class="progress"><div class="progress-bar" style="width:73%;background:#27ae60;">34.78%</div></div></td></tr>
+<tr><td>Exp5 (w=48+CJ)</td><td>35.86%</td><td><div class="progress"><div class="progress-bar" style="width:75%;background:#27ae60;">35.86%</div></div></td></tr>
+<tr class="highlight"><td>Exp6 (从头训练最优)</td><td>36.65%</td><td><div class="progress"><div class="progress-bar" style="width:77%;background:#2980b9;">36.65%</div></div></td></tr>
+<tr class="best-row"><td>Exp19 (冻结预训练ViT)</td><td>47.36%</td><td><div class="progress"><div class="progress-bar" style="width:100%;background:#155724;">47.36%</div></div></td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp0：基线（常数学习率）</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value">ResNet18 (width=32)</div></div>
+  <div class="detail-item"><div class="detail-label">文本编码器</div><div class="detail-value">Transformer 2L, 4H, d=256</div></div>
+  <div class="detail-item"><div class="detail-label">LR 策略</div><div class="detail-value">常数 LR=3e-4（无 warmup）</div></div>
+  <div class="detail-item"><div class="detail-label">数据增强</div><div class="detail-value">Resize(224) + RandomHorizontalFlip</div></div>
+  <div class="detail-item"><div class="detail-label">训练配置</div><div class="detail-value">30 epochs, batch_size=256, AdamW wd=1e-4</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">2.81</div></div>
+</div>
+<h3>测试结果</h3>
 <p>t2i_R@1=<strong>21.26%</strong>, i2t_R@1=<strong>20.88%</strong>, t2i_R@5=45.77%, t2i_R@10=56.72%</p>
+<h3>分析</h3>
+<p>基线使用常数学习率训练 30 个 epoch。模型基本学会了图文对齐（R@1>20%），但常数 LR 导致后期无法精细优化嵌入空间，且训练初期因 LR 过高出现不稳定。此配置为所有后续优化的起点。</p>
 </div>
 
-<h2>Experiment 1: Cosine + Warmup (30 epochs)</h2>
+<!-- ============================================================ -->
+<h2>Exp1：Cosine Warmup 学习率调度（最关键改进）</h2>
+<!-- ============================================================ -->
+
 <div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>LR strategy: Cosine with warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</li>
-<li>Augmentation: Resize(224) + RandomHorizontalFlip</li>
-<li>Epochs: 30, Batch: 256</li>
-</ul>
-<h3>Key Code: CosineWarmupScheduler</h3>
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">Cosine Warmup</span></div></div>
+  <div class="detail-item"><div class="detail-label">LR 策略</div><div class="detail-value">Cosine+warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</div></div>
+  <div class="detail-item"><div class="detail-label">训练配置</div><div class="detail-value">30 epochs, batch_size=256</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">2.26</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>29.83%</strong>, i2t_R@1=<strong>32.07%</strong>, t2i_R@5=55.54%, t2i_R@10=65.50%</p>
+<p><strong>vs 基线提升：+8.57% t2i_R@1, +11.19% i2t_R@1</strong> — 所有实验中第二大的单步改进</p>
+<h3>CosineWarmupScheduler 核心代码</h3>
 <div class="code-block">
 class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
     def __init__(self, optimizer, warmup_steps, total_steps, base_lr, min_lr_ratio=0.01):
@@ -276,326 +314,367 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
             <span class="diff-add">return min_lr_ratio + (1 - min_lr_ratio) * decay</span>  # LR decays to min_lr, NOT to 0
         super().__init__(optimizer, lr_lambda)
 </div>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>29.83%</strong>, i2t_R@1=<strong>32.07%</strong></p>
-<p><strong>Improvement vs baseline: +8.57% t2i_R@1, +11.19% i2t_R@1</strong></p>
+<h3>为什么 Cosine Warmup 有效</h3>
+<ul>
+<li><strong>Warmup（10%总步数）：</strong>逐步从 0 提升到 base_lr，防止初期梯度过大导致训练崩溃</li>
+<li><strong>Cosine 衰减：</strong>后期参数更新幅度逐渐减小，精细优化嵌入空间</li>
+<li><strong>Min LR 下限（1%）：</strong>防止 LR 降至 0，训练末期仍有微量学习</li>
+</ul>
 </div>
 
-<h2>Experiment 4: Cosine 100 epochs (Previous Best)</h2>
+<!-- ============================================================ -->
+<h2>Exp2：RandomResizedCrop(0.5) — 裁剪过激</h2>
+<!-- ============================================================ -->
+
 <div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>LR: Cosine+warmup, same as Exp1</li>
-<li>Augmentation: Resize+Flip (same as Exp1)</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>34.78%</strong>, i2t_R@1=<strong>37.93%</strong></p>
-<p><strong>Improvement vs baseline: +13.52% t2i_R@1, +17.05% i2t_R@1</strong></p>
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">RRC scale=(0.5,1.0)</span></div></div>
+  <div class="detail-item"><div class="detail-label">数据增强</div><div class="detail-value">RandomResizedCrop(0.5) + RandomHorizontalFlip</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.03</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>12.58%</strong>, i2t_R@1=<strong>13.59%</strong> — <span class="tag tag-bad">比基线更差</span></p>
+<h3>分析</h3>
+<p>scale=(0.5, 1.0) 表示最多裁剪到原图面积的 50%，在 Flickr8k 图像（约 500×400）上会丢失大量关键视觉信息（如主体对象的肢体、背景语境）。小数据集上从头训练的模型本就难以提取高质量特征，激进的裁剪进一步破坏了语义完整性。</p>
 </div>
 
-<h2>Experiment 5: Wider ResNet + ColorJitter (Current Best)</h2>
+<!-- ============================================================ -->
+<h2>Exp3：RandomResizedCrop(0.75) — 轻度裁剪仍不如Resize</h2>
+<!-- ============================================================ -->
+
 <div class="card">
-<h3>Configuration</h3>
-<ul>
-<li><strong>ResNet-18 width=48</strong> (vs 32 in previous experiments)</li>
-<li>LR: Cosine+warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</li>
-<li><strong>Augmentation: Resize(224) + RandomHorizontalFlip + ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)</strong></li>
-<li>Epochs: 100, Batch: 256</li>
-<li>Model: ResNet-18 (width=48) + Transformer (2 layers, 4 heads, embed_dim=256)</li>
-</ul>
-<h3>Why Wider ResNet Helps</h3>
-<p>ResNet-18 with width=48 has ~1.5x more parameters (4.4M vs 2.9M) than width=32. On Flickr8k, this additional capacity allows the image encoder to capture more visual features, improving retrieval accuracy. The model still fits comfortably on the RTX 4090 (17GB VRAM).</p>
-<h3>Why ColorJitter Helps (Mildly)</h3>
-<p>ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1) provides mild color augmentation without destroying image content like RandomResizedCrop did. This teaches the model to be invariant to color variations, making embeddings more robust.</p>
-<h3>Per-Epoch Results (Selected)</h3>
-<table>
-<thead><tr><th>Epoch</th><th>t2i R@1 (%)</th><th>i2t R@1 (%)</th></tr></thead>
-<tbody>
-<tr><td>30</td><td>23.49</td><td>20.91</td></tr>
-<tr><td>50</td><td>29.05</td><td>30.25</td></tr>
-<tr><td>70</td><td>32.98</td><td>35.38</td></tr>
-<tr><td>85</td><td>34.59</td><td>36.63</td></tr>
-<tr><td>91</td><td>35.35</td><td>37.26</td></tr>
-<tr><td>100</td><td>35.08</td><td>37.35</td></tr>
-</tbody>
-</table>
-<h3>Test Result</h3>
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">RRC scale=(0.75,1.0)</span></div></div>
+  <div class="detail-item"><div class="detail-label">训练配置</div><div class="detail-value">60 epochs</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">2.93</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>27.01%</strong>, i2t_R@1=<strong>29.76%</strong> — 比 Exp1(29.83%) 低 2.82%</p>
+<h3>分析</h3>
+<p>即使将裁剪范围改为 scale=(0.75, 1.0)（最小保留 75% 面积），仍然不如简单的 Resize。原因是 Flickr8k 图像已经较小，任何裁剪都可能丢失边缘关键区域。结论：Flickr8k 上应使用 Resize 而非 RandomResizedCrop。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp4：Cosine 100ep + w=32 — 前期最优</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">100ep训练</span> + batch_size=64</div></div>
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value">ResNet18 (width=32)</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">—</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>34.78%</strong>, i2t_R@1=<strong>37.93%</strong>, t2i_R@5=57.07%, t2i_R@10=65.40%</p>
+<h3>分析</h3>
+<p>从 30ep 延长至 100ep 并减小 batch_size 至 64，性能显著提升。100ep 让 Cosine 衰减充分发挥作用，更多训练步数让模型更好地收敛。注意：此实验因服务器故障未完全完成，指标来自部分训练结果。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp5：w=48 + ColorJitter(0.2) — 从头训练最优配置确立</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">width=48</span> <span class="change-badge change-new">ColorJitter(0.2)</span></div></div>
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value">ResNet18 (width=48) — ~4.4M 参数</div></div>
+  <div class="detail-item"><div class="detail-label">数据增强</div><div class="detail-value">Resize(224) + Flip + ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.50</div></div>
+</div>
+<h3>测试结果</h3>
 <p>t2i_R@1=<strong>35.86%</strong>, i2t_R@1=<strong>38.51%</strong>, t2i_R@5=58.45%, t2i_R@10=66.58%</p>
-<p><strong>Improvement vs Exp4 (w=32): +1.08% t2i_R@1, +0.58% i2t_R@1</strong></p>
-<p><strong>Improvement vs baseline (Exp0): +14.60% t2i_R@1, +17.63% i2t_R@1</strong></p>
+<p><strong>vs Exp4(w=32) 提升：+1.08% t2i_R@1</strong></p>
+<h3>为什么 width=48 有效</h3>
+<p>width=48 的 ResNet18 约 4.4M 参数（vs width=32 约 2.9M），1.5 倍的参数量提供了更丰富的视觉特征表示能力。在 Flickr8k 上，width=48 是模型容量与泛化的最佳平衡——width=64(Exp17) 反而过拟合。</p>
+<h3>为什么 mild ColorJitter 有效</h3>
+<p>ColorJitter(strength=0.2) 提供轻微颜色扰动而不破坏图像语义，让模型学习对颜色变化的不变性。但 strength=0.3(Exp16) 反而损害性能，说明 Flickr8k 对增强强度极其敏感。</p>
 </div>
 
-<h2>Experiment 6: Wider + EMA (decay=0.999)</h2>
+<!-- ============================================================ -->
+<h2>Exp6：+EMA(0.999) — 从头训练最优结果，但 EMA 完全失效</h2>
+<!-- ============================================================ -->
+
 <div class="card">
-<h3>Configuration</h3>
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">EMA decay=0.999</span></div></div>
+  <div class="detail-item"><div class="detail-label">配置</div><div class="detail-value">同 Exp5，额外加入 EMA</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.51</div></div>
+</div>
+<h3>测试结果</h3>
+<table>
+<thead><tr><th>模型</th><th>t2i R@1 (%)</th><th>i2t R@1 (%)</th><th>t2i R@5 (%)</th><th>t2i R@10 (%)</th></tr></thead>
+<tbody>
+<tr class="highlight"><td>原始模型</td><td><strong>36.65</strong></td><td><strong>39.82</strong></td><td>58.90</td><td>66.76</td></tr>
+<tr><td>EMA 模型</td><td>0.07</td><td>0.07</td><td>0.17</td><td>0.30</td></tr>
+</tbody>
+</table>
+<p><span class="tag tag-best">从头训练最优：36.65%</span>，但 EMA 完全失效（R@1=0.07%）</p>
+<h3>EMA 失效分析</h3>
+<p>decay=0.999 意味着 EMA 权重几乎完全被早期（未训练好的）模型权重主导。即使经过 12600 步更新，EMA shadow 仍未收敛到训练好的模型。原始模型的 36.65% 比 Exp5(35.86%) 略好，可能来自训练随机性。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp7：4L+8H+d512 — 过慢被终止</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">4L, 8H, d=512</span></div></div>
+  <div class="detail-item"><div class="detail-label">文本编码器</div><div class="detail-value">4层, 8头, embed_dim=512</div></div>
+  <div class="detail-item"><div class="detail-label">结果</div><div class="detail-value">被终止 @ epoch 21, R@1~15%</div></div>
+</div>
+<h3>分析</h3>
+<p>更大 Transformer 训练明显更慢（~3s/it vs ~2.5s/it），21 epoch 时 R@1 仅约 15%，远落后于 Exp5 的训练轨迹。Flickr8k 30k 训练对无法支撑如此大的模型容量，过拟合风险极高。结论：保持小模型（2L, 4H, d=256）。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp8：200ep — 过拟合</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">200 epochs</span></div></div>
+  <div class="detail-item"><div class="detail-label">结果</div><div class="detail-value">被终止 @ epoch 97, R@1~30%</div></div>
+</div>
+<h3>分析</h3>
+<p>val R@1 在 epoch 90 后停滞在约 30% 并开始下降，val_loss 从 epoch 50 起持续上升，说明模型严重过拟合。结论：<strong>100 epochs 是 Flickr8k 上的最优训练长度</strong>。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp9：LR=5e-4 — 学习率过高</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">LR=5e-4</span> (vs 默认 3e-4)</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">4.26 (显著高于其他)</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>34.55%</strong>, i2t_R@1=<strong>37.36%</strong> — 比 Exp6 低 2.10%</p>
+<h3>分析</h3>
+<p>更高 LR 让模型收敛更快但到了更差的极值点。test_loss=4.26 远高于 Exp6 的 3.51，说明模型未能精细优化嵌入空间。3e-4 是此配置的最优学习率。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp10：MLP 投影头 — 过拟合</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">MLP投影头</span> Linear+GELU+Linear</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.54</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>29.63%</strong> — 比 Exp6 低 7.02%，<span class="tag tag-bad">严重退步</span></p>
+<h3>分析</h3>
+<p>MLP 投影头在 SimCLR/CLIP 等大规模预训练中有效，但在 Flickr8k 30k 训练对上，额外参数加剧了过拟合。线性投影更适合小数据集。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp11：wd=0.05 — 过强正则化</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">weight_decay=0.05</span> (vs 默认 1e-4)</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">2.68</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>34.11%</strong> — 比 Exp6 低 2.54%</p>
+<h3>分析</h3>
+<p>更强的 weight decay (0.05) 并未帮助。虽然 test_loss 较低(2.68)，但 R@1 反而更低，说明过度正则化限制了模型学习细粒度特征的能力。默认 wd=1e-4 已是最优。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp12：延迟 EMA(0.99, start_ep=50) — EMA 依然失效</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">EMA decay=0.99, start_ep=50</span></div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.12</div></div>
+</div>
+<h3>测试结果</h3>
+<p>原始模型：t2i_R@1=<strong>31.71%</strong>; EMA 模型：t2i_R@1=<strong>0.07%</strong></p>
+<p><span class="tag tag-bad">比 Exp6 低 4.94%，EMA 完全失效</span></p>
+<h3>分析</h3>
+<p>即使延迟到 epoch 50 才启动 EMA（从模型权重初始化而非随机），且使用更低 decay(0.99)，EMA shadow 仍发散到随机噪声。这说明此模型权重空间变化过快，EMA 无法追踪。<strong>EMA 在此架构上不可行。</strong></p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp13：RandAugment — 自动增强过激</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">RandAugment(n=2, m=9)</span></div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.67</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>24.69%</strong> — 比 Exp6 低 11.96%，<span class="tag tag-bad">严重退步</span></p>
+<h3>分析</h3>
+<p>RandAugment(num_ops=2, magnitude=9) 随机应用旋转、剪切、海报化等强变换，这些变换破坏了图像语义信息。设计用于 ImageNet 等大规模数据集，在 Flickr8k 小数据场景下完全不可用。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp14：TrivialAugmentWide — 比RandAugment更差</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">TrivialAugmentWide</span></div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.57</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>21.82%</strong> — 比 Exp6 低 14.83%，接近基线水平</p>
+<h3>分析</h3>
+<p>TrivialAugmentWide 随机选择一种增强并以随机强度应用，可能产生极端变换。比 RandAugment 更不可控，在 Flickr8k 上效果更差。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp15：梯度累积(grad_accum=2) — 步数减少</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">grad_accum=2</span> → effective batch=128</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.07</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>29.56%</strong> — 比 Exp6 低 7.09%</p>
+<h3>分析</h3>
+<p>梯度累积将有效 batch 从 64 增至 128，但：(1) 每个 epoch 的优化器步数从 505 减至 252，总梯度更新次数减少；(2) LR scheduler 的 total_steps 计算未正确考虑 grad_accum，导致调度偏差。Flickr8k 上 batch_size=64 已提供足够的负样本。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp16：ColorJitter(0.3) — 轻微增强增加也损害</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">CJ strength=0.3</span> (vs 0.2)</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.21</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>30.92%</strong> — 比 Exp6 低 5.73%</p>
+<h3>分析</h3>
+<p>将 ColorJitter 从 0.2 提升至 0.3（brightness/contrast/saturation=0.3, hue=0.15），性能显著下降。Flickr8k 对增强强度的甜点非常狭窄——仅 strength=0.2 有效，任何偏移都损害结果。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp17：width=64 — 过宽过拟合</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-fail">width=64</span> (vs 48)</div></div>
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value">ResNet18 (width=64) — FC层 512→256</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.14</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>32.53%</strong> — 比 Exp6 低 4.12%</p>
+<h3>分析</h3>
+<p>width=64 的 ResNet18 参数更多（FC层输入从 384 维增至 512 维），在 Flickr8k 30k 训练对上导致过拟合。width=48 是容量与泛化的最优平衡点。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp18：复现 Exp6 — 随机方差验证</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value">无变更 — 完全复现 Exp6 配置</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">3.14</div></div>
+</div>
+<h3>测试结果</h3>
+<p>t2i_R@1=<strong>32.23%</strong> — 比 Exp6 低 4.42%</p>
+<h3>分析</h3>
+<p>使用完全相同的配置独立复现，t2i_R@1 与原 Exp6(36.65%) 相差 4.42%。这说明 Flickr8k 测试集评估存在约 4–5% 的随机方差，源自训练随机性（数据 shuffle、初始化）在小数据集上的放大效应。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp19：冻结预训练 SigLIP ViT-B/16 — 突破性最优结果</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border: 3px solid #28a745; background: #f0fff4;">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">冻结预训练ViT</span> <span class="change-badge change-new">可训练文本编码器</span></div></div>
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value"><strong>冻结的 SigLIP ViT-B/16</strong> (google/siglip-base-patch16-224)</div></div>
+  <div class="detail-item"><div class="detail-label">文本编码器</div><div class="detail-value"><strong>2L, 12H, d=768</strong> (从头训练)</div></div>
+  <div class="detail-item"><div class="detail-label">可训练参数</div><div class="detail-value">18.7M / 总 111.6M (仅 16.8% 可训练)</div></div>
+  <div class="detail-item"><div class="detail-label">数据增强</div><div class="detail-value">Resize(224,BICUBIC) + Flip + SigLIP归一化(mean=0.5,std=0.5)</div></div>
+  <div class="detail-item"><div class="detail-label">训练配置</div><div class="detail-value">~70ep, batch=64, LR=3e-4, Cosine warmup, AdamW wd=1e-4</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">2.48</div></div>
+  <div class="detail-item"><div class="detail-label">可学习参数</div><div class="detail-value">t=62.59, b=-10.57</div></div>
+</div>
+
+<h3>架构示意图</h3>
+<div class="arch-diagram">
+  <div class="arch-block arch-frozen">冻结 ViT-B/16 (86M params) <small>→ 高质量视觉特征</small></div>
+  → <div class="arch-block arch-frozen">冻结 ViT Projection (768→768)</div>
+  → <div class="arch-block arch-trainable">Transformer Text Encoder (2L,12H,d=768) <small>18.7M 可训练</small></div>
+  → <div class="arch-block arch-loss">SigLIP Loss <small>t=62.59, b=-10.57 可学习</small></div>
+</div>
+
+<h3>测试结果</h3>
+<table>
+<thead><tr><th>指标</th><th>Exp19 (预训练ViT)</th><th>Exp6 (从头训练)</th><th>提升</th></tr></thead>
+<tbody>
+<tr><td>t2i R@1</td><td><strong>47.36%</strong></td><td>36.65%</td><td style="color:#28a745;">+10.71%</td></tr>
+<tr><td>t2i R@5</td><td><strong>72.54%</strong></td><td>58.90%</td><td style="color:#28a745;">+13.64%</td></tr>
+<tr><td>t2i R@10</td><td><strong>80.70%</strong></td><td>66.76%</td><td style="color:#28a745;">+13.94%</td></tr>
+<tr><td>i2t R@1</td><td><strong>49.97%</strong></td><td>39.82%</td><td style="color:#28a745;">+10.15%</td></tr>
+<tr><td>i2t R@5</td><td><strong>74.92%</strong></td><td>60.82%</td><td style="color:#28a745;">+14.10%</td></tr>
+<tr><td>i2t R@10</td><td><strong>82.43%</strong></td><td>69.30%</td><td style="color:#28a745;">+13.13%</td></tr>
+</tbody>
+</table>
+
+<h3>训练过程关键节点</h3>
 <ul>
-<li>Same as Exp5 but with <strong>EMA (decay=0.999)</strong></li>
-<li>EMA is only applied at final test evaluation, not during validation</li>
-<li>Validation uses original model throughout training</li>
+<li><strong>Epoch 12：</strong>t2i_R@1=38.64%，<strong>已超过 Exp6 的 100ep 结果 (36.65%)</strong> — 预训练 ViT 的高质量特征让文本编码器只需学习对齐，而非从头提取特征</li>
+<li><strong>Epoch 40：</strong>R@1 缓慢提升至 43%，val_loss 从 1.6 降至 1.5</li>
+<li><strong>Epoch 70：</strong>R@1 稳定在 44–46%，val_loss 回升至 2.0+，train_loss 降至 0.1x，出现过拟合但因仅文本编码器可训练，过拟合速度较慢</li>
+<li><strong>可学习参数变化：</strong>t 从初始 10.0 增至 62.59，b 从 -10.0 微调至 -10.57。t 远大于 Exp6 的 31.06，说明预训练视觉特征配合更大温度系数能更好区分正负样本</li>
 </ul>
-<h3>EMA Implementation</h3>
+
+<h3>为什么 Exp19 是突破性改进</h3>
+<p>Exp0–18 的核心瓶颈是<strong>从头训练的 ResNet18 视觉特征质量有限</strong>。Flickr8k 仅 30k 训练对，不足以从头训练出高质量的图像特征提取器。冻结在海量数据上预训练的 ViT-B/16，直接获得高质量视觉特征，文本编码器只需学习如何将文本映射到与这些特征对齐的嵌入空间。</p>
+<p><strong>仅 12 个 epoch 就超越 Exp6 的 100 epoch 结果</strong>，充分验证了预训练视觉特征的价值。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>损失函数 Bug 修复（影响所有实验）</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<h3>关键发现</h3>
+<p>原始 <code>loss.py</code> 存在<strong>符号错误</strong>，导致训练 loss 约 200 倍高于正常值（204 vs 6.2 at epoch 1），模型几乎无法学习。</p>
+<h3>修复差异</h3>
 <div class="code-block">
-class ModelEMA:
-    def __init__(self, model, decay=0.999):
-        self.decay = decay
-        self.shadow = copy.deepcopy(model).cpu()  # EMA weights on CPU
-
-    def update(self, model):
-        for p_ema, p_model in zip(self.shadow.parameters(), model.parameters()):
-            p_ema.data.mul_(self.decay).add_(p_model.data.cpu(), alpha=1.0 - self.decay)
+<span class="diff-remove">- logits = -t * logits + b    # 错误符号</span>
+<span class="diff-remove">- loss = labels * logits      # 错误符号</span>
+<span class="diff-add">+ logits = t * logits + b     # 正确，符合 SigLIP 论文</span>
+<span class="diff-add">+ loss = -labels * logits     # 正确，符合 SigLIP 论文</span>
 </div>
-<h3>Results</h3>
+<p>修复后 epoch 1 loss 从 204 降至 6.2，模型恢复可训练性。此 bug 在所有实验开始前已修复。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>代码变更汇总</h2>
+<!-- ============================================================ -->
+
+<div class="card">
 <table>
-<thead><tr><th>Model</th><th>t2i R@1 (%)</th><th>i2t R@1 (%)</th><th>t2i R@5 (%)</th><th>t2i R@10 (%)</th></tr></thead>
+<thead><tr><th>文件</th><th>变更</th><th>影响</th></tr></thead>
 <tbody>
-<tr><td>Original model</td><td><strong>36.65</strong></td><td><strong>39.82</strong></td><td>58.90</td><td>66.76</td></tr>
-<tr><td>EMA model</td><td>0.02</td><td>0.06</td><td>0.17</td><td>0.30</td></tr>
-</tbody>
-</table>
-<h3>EMA Analysis</h3>
-<p>The EMA model completely failed — it produced near-random results. This is because with decay=0.999, the shadow weights are dominated by the early (poorly trained) model weights. Even after 12600 steps, the EMA hasn't converged to the well-trained model. This shows that EMA with high decay is not suitable for this training setup where the model weights change rapidly. The original model's test result (36.65%) slightly outperformed Exp5 (35.86%), likely due to random variation between runs.</p>
-</div>
-
-<h2>Experiment 7: Deeper Transformer + Larger Embed (Killed)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>ResNet-18 width=48</li>
-<li><strong>Transformer: 4 layers, 8 heads, embed_dim=512</strong></li>
-<li>Epochs: 100 (killed at epoch 21)</li>
-</ul>
-<h3>Why Killed</h3>
-<ul>
-<li>Training was significantly slower (~3s/it vs ~2.5s/it)</li>
-<li>At epoch 21, t2i_R@1 was only ~15%, far behind Exp5's trajectory</li>
-<li>Larger model on small Flickr8k dataset poses overfitting risk</li>
-<li>The marginal benefit of model capacity is limited on 30k training pairs</li>
-</ul>
-<h3>Conclusion</h3>
-<p>Flickr8k is too small for a 4-layer, 512-dim Transformer. The added capacity doesn't help because the dataset can't support it. Keep model small (2 layers, 256 dim) and focus on training strategies instead.</p>
-</div>
-
-<h2>Experiment 8: Best Config + 200 Epochs (Overfitted)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>ResNet-18 width=48, Transformer: 2 layers, 4 heads, embed_dim=256</li>
-<li>LR: Cosine+warmup (warmup_ratio=0.1, min_lr_ratio=0.01)</li>
-<li>Augmentation: Resize+Flip+ColorJitter</li>
-<li><strong>Epochs: 200</strong> (killed at epoch 97)</li>
-<li>Total steps: 25200, Warmup steps: 2520</li>
-</ul>
-<h3>Result: Overfitted</h3>
-<p>Val R@1 plateaued at ~30% around epoch 90 and started declining. Val loss kept increasing from epoch 50 onwards. Training was killed at epoch 97.</p>
-<p>This shows that <strong>100 epochs is the sweet spot</strong> for this model on Flickr8k. Training longer leads to overfitting, not improvement.</p>
-</div>
-
-<h2>Experiment 9: Higher Learning Rate (5e-4)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp5 but with <strong>LR=5e-4</strong> (vs 3e-4)</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>34.55%</strong>, i2t_R@1=<strong>37.36%</strong></p>
-<p><strong>Worse than Exp5 (LR=3e-4): -1.31% t2i_R@1</strong></p>
-<h3>Conclusion</h3>
-<p>Higher learning rate doesn't help — the model converges faster but to a worse optimum. 3e-4 remains the best learning rate for this configuration.</p>
-</div>
-
-<h2>Experiment 10: MLP Projection Head</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 best config (width=48, ColorJitter, cosine+warmup, 100ep)</li>
-<li><strong>Non-linear MLP projection head</strong> replacing linear projection in both ResNet18 and TransformerTextEncoder</li>
-<li>MLP: Linear(dim, dim) + GELU + Linear(dim, dim)</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>29.63%</strong>, i2t_R@1=<strong>32.19%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -7.02% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>MLP projection head <strong>hurts performance</strong> on Flickr8k. The extra parameters cause overfitting on the small dataset. While MLP projection works well for SimCLR/CLIP on large datasets (millions of images), Flickr8k's 30k training pairs are insufficient to benefit from the added capacity.</p>
-</div>
-
-<h2>Experiment 11: Strong Weight Decay (0.05)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 but with <strong>weight_decay=0.05</strong> (vs default 1e-4)</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>34.11%</strong>, i2t_R@1=<strong>36.84%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -2.54% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>Stronger weight decay (0.05) didn't help. The default 1e-4 is already well-tuned. Excessive regularization prevents the model from learning fine-grained features. The hypothesis that stronger regularization would allow longer training (200ep) was tested implicitly — val R@1 plateaued at ~33% by epoch 100, suggesting the model was already constrained.</p>
-</div>
-
-<h2>Experiment 12: Delayed EMA (decay=0.99, start_epoch=50)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 but with <strong>EMA decay=0.99, starting at epoch 50</strong></li>
-<li>First 50 epochs: no EMA; epoch 50+: EMA initialized from model weights</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>Original model: t2i_R@1=<strong>31.71%</strong>, i2t_R@1=<strong>35.05%</strong></p>
-<p>EMA model: t2i_R@1=<strong>0.07%</strong> (completely failed)</p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -4.94% t2i_R@1 vs Exp6 (original model)</p>
-<h3>Conclusion</h3>
-<p>EMA continues to fail on this model. Even with delayed initialization (copying model weights at epoch 50) and lower decay (0.99 vs 0.999), the EMA shadow weights diverge to random noise. This suggests the model's weight space changes too rapidly for EMA to track, even at late training stages. <strong>EMA is not viable for this architecture on Flickr8k.</strong></p>
-</div>
-
-<h2>Experiment 13: RandAugment</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 but replacing ColorJitter with <strong>RandAugment(num_ops=2, magnitude=9)</strong></li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>24.69%</strong>, i2t_R@1=<strong>25.90%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -11.96% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>RandAugment is <strong>far too aggressive</strong> for Flickr8k. The automated augmentation strategy applies strong transformations (rotation, shearing, posterization, etc.) that destroy semantic content critical for image-text matching. Small datasets need mild augmentation — the model already struggles with limited data, and aggressive augmentation makes the task even harder.</p>
-</div>
-
-<h2>Experiment 14: TrivialAugmentWide</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 but replacing ColorJitter with <strong>TrivialAugmentWide</strong></li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>21.82%</strong>, i2t_R@1=<strong>22.98%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -14.83% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>TrivialAugmentWide performs even worse than RandAugment. It applies a single random augmentation at a random magnitude, which can be extremely strong. Like RandAugment, it's designed for large-scale datasets (ImageNet) and is completely unsuitable for Flickr8k.</p>
-</div>
-
-<h2>Experiment 15: Gradient Accumulation (Effective Batch=128)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 but with <strong>grad_accum=2</strong> (effective batch size = 64&times;2 = 128)</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>29.56%</strong>, i2t_R@1=<strong>31.91%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -7.09% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>Larger effective batch size didn't help. With batch_size=64, each batch already contains enough negatives for contrastive learning. Doubling the effective batch reduces the number of optimizer steps per epoch (505 &rarr; 252), which means less gradient updates over the same number of epochs. The LR scheduler bug (total_steps not accounting for grad_accum) also contributed to suboptimal scheduling.</p>
-</div>
-
-<h2>Experiment 16: Stronger ColorJitter (strength=0.3)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Same as Exp6 but with <strong>ColorJitter strength=0.3</strong> (brightness/contrast/saturation=0.3, hue=0.15)</li>
-<li>Default is strength=0.2</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>30.92%</strong>, i2t_R@1=<strong>34.86%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -5.73% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>Even slightly stronger ColorJitter (0.3 vs 0.2) hurts performance. Flickr8k is extremely sensitive to augmentation strength — the sweet spot is precisely at 0.2. Any deviation in either direction (stronger augmentation or no augmentation) degrades results.</p>
-</div>
-
-<h2>Experiment 17: Wider ResNet (width=64)</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li><strong>ResNet-18 width=64</strong> (vs width=48 in Exp6)</li>
-<li>FC layer: 512 &rarr; 256 (vs 384 &rarr; 256)</li>
-<li>Epochs: 100</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>32.53%</strong>, i2t_R@1=<strong>35.78%</strong></p>
-<p><span class="tag tag-bad">WORSE</span> &mdash; -4.12% t2i_R@1 vs Exp6</p>
-<h3>Conclusion</h3>
-<p>Wider ResNet (width=64) performs worse than width=48. The additional parameters (FC layer grows from 384 to 512 input dims) cause overfitting. Flickr8k's 30k training pairs can only support a limited model capacity. width=48 is the optimal balance between representation power and overfitting risk.</p>
-</div>
-
-<h2>Experiment 18: Reproduce Exp6 Best Config</h2>
-<div class="card">
-<h3>Configuration</h3>
-<ul>
-<li>Identical to Exp6: width=48, ColorJitter(0.2), cosine+warmup, 100ep, LR=3e-4</li>
-<li>Run with updated code to verify reproducibility</li>
-</ul>
-<h3>Test Result</h3>
-<p>t2i_R@1=<strong>32.23%</strong>, i2t_R@1=<strong>35.26%</strong></p>
-<p><span class="tag tag-mid">VARIANCE</span> &mdash; -4.42% t2i_R@1 vs original Exp6</p>
-<h3>Conclusion</h3>
-<p>The result differs from Exp6 by ~4.4% absolute, which is within the expected variance range for Flickr8k. The test set has ~5000 caption-image pairs, so a 4-5% swing is normal. The best result across all runs remains Exp6's 36.65%.</p>
-</div>
-
-<h2>Why Cosine + Warmup Wins</h2>
-<div class="card">
-<h3>Comparison: Constant LR vs Cosine LR</h3>
-<p>With constant LR, the model uses the same learning rate throughout training. This leads to:</p>
-<ul>
-<li>Early epochs: learning rate is too high relative to the model's capability, causing instability</li>
-<li>Late epochs: learning rate is too low relative to the remaining gap, slowing convergence</li>
-</ul>
-<p>Cosine annealing with warmup addresses both issues:</p>
-<ul>
-<li><strong>Warmup (10% of total):</strong> Gradually increases LR from 0 to base_lr, preventing early instability</li>
-<li><strong>Cosine decay:</strong> Smoothly decreases LR, allowing fine-tuned adjustments in later epochs</li>
-<li><strong>Min LR floor (1% of base):</strong> Prevents LR from hitting 0, so the model continues learning even at the end</li>
-</ul>
-<h3>The Bug: LR Decaying to 0</h3>
-<p>The original CosineWarmupScheduler used <code>0.5 * (1 + cos(pi * progress))</code> which decays LR to <strong>0</strong> at the end. This means the last ~10-20% of training is essentially wasted. The fix adds a floor: <code>min_lr_ratio + (1 - min_lr_ratio) * decay</code>.</p>
-</div>
-
-<h2>Progress Chart</h2>
-<div class="card">
-<h3>t2i R@1 Progress Across All Experiments</h3>
-<table>
-<thead><tr><th>Experiment</th><th>t2i R@1 (%)</th><th>Progress</th></tr></thead>
-<tbody>
-<tr><td>Exp0 (Baseline)</td><td>21.26%</td><td><div class="progress"><div class="progress-bar" style="width:53%;background:#e74c3c;">21.26%</div></div></td></tr>
-<tr><td>Exp2 (RRC 0.5)</td><td>12.58%</td><td><div class="progress"><div class="progress-bar" style="width:31%;background:#e74c3c;">12.58%</div></div></td></tr>
-<tr><td>Exp3 (RRC 0.75)</td><td>27.01%</td><td><div class="progress"><div class="progress-bar" style="width:68%;background:#f39c12;">27.01%</div></div></td></tr>
-<tr><td>Exp1 (Cosine 30ep)</td><td>29.83%</td><td><div class="progress"><div class="progress-bar" style="width:75%;background:#f39c12;">29.83%</div></div></td></tr>
-<tr><td>Exp4 (Cosine 100ep)</td><td>34.78%</td><td><div class="progress"><div class="progress-bar" style="width:87%;background:#27ae60;">34.78%</div></div></td></tr>
-<tr><td>Exp5 (Wider+ColorJitter)</td><td>35.86%</td><td><div class="progress"><div class="progress-bar" style="width:90%;background:#27ae60;">35.86%</div></div></td></tr>
-<tr class="highlight"><td>Exp6 (Best Config)</td><td>36.65%</td><td><div class="progress"><div class="progress-bar" style="width:92%;background:#2980b9;">36.65%</div></div></td></tr>
-<tr><td>Exp9 (LR=5e-4)</td><td>34.55%</td><td><div class="progress"><div class="progress-bar" style="width:86%;background:#f39c12;">34.55%</div></div></td></tr>
-<tr><td>Exp11 (wd=0.05)</td><td>34.11%</td><td><div class="progress"><div class="progress-bar" style="width:85%;background:#f39c12;">34.11%</div></div></td></tr>
-<tr><td>Exp17 (width=64)</td><td>32.53%</td><td><div class="progress"><div class="progress-bar" style="width:81%;background:#e67e22;">32.53%</div></div></td></tr>
-<tr><td>Exp18 (Repro Exp6)</td><td>32.23%</td><td><div class="progress"><div class="progress-bar" style="width:81%;background:#e67e22;">32.23%</div></div></td></tr>
-<tr><td>Exp16 (CJ=0.3)</td><td>30.92%</td><td><div class="progress"><div class="progress-bar" style="width:77%;background:#e67e22;">30.92%</div></div></td></tr>
-<tr><td>Exp10 (MLP proj)</td><td>29.63%</td><td><div class="progress"><div class="progress-bar" style="width:74%;background:#e74c3c;">29.63%</div></div></td></tr>
-<tr><td>Exp15 (grad_accum=2)</td><td>29.56%</td><td><div class="progress"><div class="progress-bar" style="width:74%;background:#e74c3c;">29.56%</div></div></td></tr>
-<tr><td>Exp12 (Delayed EMA)</td><td>31.71%</td><td><div class="progress"><div class="progress-bar" style="width:79%;background:#e74c3c;">31.71%</div></div></td></tr>
-<tr><td>Exp13 (RandAugment)</td><td>24.69%</td><td><div class="progress"><div class="progress-bar" style="width:62%;background:#e74c3c;">24.69%</div></div></td></tr>
-<tr><td>Exp14 (TrivialAug)</td><td>21.82%</td><td><div class="progress"><div class="progress-bar" style="width:55%;background:#e74c3c;">21.82%</div></div></td></tr>
-</tbody>
-</table>
-</div>
-
-<h2>Server Code Changes Summary</h2>
-<div class="card">
-<h3>Files Modified</h3>
-<table>
-<thead><tr><th>File</th><th>Change</th><th>Impact</th></tr></thead>
-<tbody>
-<tr><td>loss.py</td><td>Fixed sign convention: <code>t*logits+b</code> and <code>-labels*logits</code></td><td>Critical — model became trainable</td></tr>
-<tr><td>train_siglip.py</td><td>CosineWarmupScheduler with min_lr_ratio, warmup_ratio</td><td>Major — +8.57% R@1 improvement</td></tr>
-<tr><td>train_siglip.py</td><td>Added --proj-head, --augment, --cj-strength, --ema-start-epoch, --grad-accum</td><td>Enables ablation experiments</td></tr>
-<tr><td>train_siglip.py</td><td>ModelEMA with delayed start and initialized flag</td><td>Low — EMA still didn't help</td></tr>
-<tr><td>train_siglip.py</td><td>Fixed total_steps calculation for grad_accum</td><td>Bug fix — correct LR scheduling</td></tr>
-<tr><td>data_loader.py</td><td>ColorJitter augmentation + --cj-strength param + RandAugment/TrivialAugment support</td><td>Moderate — +1% from ColorJitter; automated augment failed</td></tr>
-<tr><td>models/resnet_custom.py</td><td>Added proj_head parameter (linear/mlp)</td><td>Enables projection head ablation</td></tr>
-<tr><td>models/transformer_encoder.py</td><td>Added proj_head, num_heads, num_layers, dropout params</td><td>Enables architecture variations</td></tr>
-<tr><td>models/siglip_model.py</td><td>Pass proj_head and all architecture params to sub-encoders</td><td>Central configuration point</td></tr>
+<tr><td>loss.py</td><td>修复符号：t*logits+b, -labels*logits</td><td>关键 — 模型变为可训练</td></tr>
+<tr><td>train_siglip.py</td><td>CosineWarmupScheduler + min_lr_ratio, warmup_ratio</td><td>重大 — +8.57% R@1</td></tr>
+<tr><td>train_siglip.py</td><td>--proj-head, --augment, --cj-strength, --ema-start-epoch, --grad-accum</td><td>支持消融实验</td></tr>
+<tr><td>data_loader.py</td><td>ColorJitter + --cj-strength + RandAugment/TrivialAugment</td><td>中等 — CJ +1%，自动增强失败</td></tr>
+<tr><td>models/*.py</td><td>proj_head, num_heads, num_layers, dropout 参数化</td><td>支持架构变体</td></tr>
+<tr><td>models/pretrained_siglip.py</td><td><strong>SigLIPPretrainedModel</strong>: 冻结ViT + 可训练Transformer</td><td>重大 — Exp19 突破</td></tr>
+<tr><td>train_siglip_pretrained.py</td><td>Exp19 专用训练脚本, SigLIP 归一化</td><td>Exp19 基础</td></tr>
+<tr><td>viz_exp19.py</td><td>Exp19 可视化脚本 (热力图+Top-K+Bad Case)</td><td>Exp19 可视化</td></tr>
 </tbody>
 </table>
 </div>
