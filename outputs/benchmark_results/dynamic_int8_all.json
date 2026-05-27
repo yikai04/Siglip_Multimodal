@@ -1,0 +1,29 @@
+{
+  "name": "dynamic_int8_all",
+  "scope": "all",
+  "metrics": {
+    "t2i_R@1": 0.3648047454275828,
+    "i2t_R@1": 0.36717325227963526,
+    "t2i_R@5": 0.6544735541275334,
+    "i2t_R@5": 0.6711246200607903,
+    "t2i_R@10": 0.7659416707859614,
+    "i2t_R@10": 0.7832826747720365,
+    "test_loss": 1.6543254158724314
+  },
+  "latency": {
+    "avg_batch_ms": 3786.408088899043,
+    "avg_per_sample_ms": 59.162626389047546,
+    "n_runs": 10,
+    "avg_batch_size": 64.0
+  },
+  "size": {
+    "total_params": 26998272,
+    "trainable_params": 2381568,
+    "total_mb": 102.990234375
+  },
+  "size_before": {
+    "total_params": 159837696,
+    "trainable_params": 43118592,
+    "total_mb": 609.732421875
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Prune ViT-drop2 DB-drop1",
+  "vit_drop": 2,
+  "db_drop": 1,
+  "vit_remaining": 10,
+  "db_remaining": 5,
+  "metrics": {
+    "t2i_R@1": 0.0004943153732081067,
+    "i2t_R@1": 0.0,
+    "t2i_R@5": 0.0014829461196243204,
+    "i2t_R@5": 0.001519756838905775,
+    "t2i_R@10": 0.0034602076124567475,
+    "i2t_R@10": 0.00364741641337386,
+    "test_loss": 11.56994650732805
+  },
+  "latency": {
+    "avg_batch_ms": 861.0310211181641,
+    "avg_per_sample_ms": 6.726804852485657,
+    "n_runs": 20,
+    "avg_batch_size": 128.0
+  },
+  "size": {
+    "total_params": 138574080,
+    "trainable_params": 43118592,
+    "total_mb": 528.6181640625
+  }
+}
