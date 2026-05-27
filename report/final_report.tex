@@ -51,7 +51,7 @@
 \fancyfoot[C]{\thepage}
 
 \title{\textbf{基于SigLIP的小规模图文检索系统}\\\Large 最终报告}
-\author{Yi Kai}
+\author{黄翊愷 \\ 2023080001 \\ 无33}
 \date{2026年5月}
 
 \begin{document}
@@ -65,6 +65,7 @@
 项目经历了四个阶段的系统性优化。\textbf{第一阶段}（中期基线）：使用 ResNet18 + MLP/Transformer 从头训练，t2i\_R@1 约 27\%，发现过拟合是主要瓶颈。\textbf{第二阶段}（从头训练优化）：经过 19 组实验（Exp0--18）探索学习率调度、模型容量、数据增强等策略，最优配置（Exp6）达到 t2i\_R@1=36.65\%，但天花板明显。\textbf{第三阶段}（预训练突破）：引入预训练 ViT-B/16 替换从头训练的 ResNet18，Exp19 一跃达到 47.36\%（+10.71pp），仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果。\textbf{第四阶段}（双预训练 + 部分解冻）：进一步引入预训练 DistilBERT，Exp20 全解冻导致过拟合（88M 可训练参数），Exp21 采用部分解冻策略（仅 36M 可训练参数）取得最终最优结果 t2i\_R@1=58.03\%、i2t\_R@1=60.09\%，相比基线提升 36.77 个百分点。此外，BF16 半精度推理实现 3.82$\times$ 加速且精度几乎无损，而层剪枝和 INT8 动态量化在无重训练条件下严重损害精度。
 \end{abstract}
 
+\newpage
 \tableofcontents
 \newpage
 
@@ -193,11 +194,11 @@ Exp21 & ViT-B/16 顶层3层 & DistilBERT 顶层2层 & 双方部分解冻 + 差�
 \end{tabular}
 \end{table}
 
-\textbf{Exp19}：将图像编码器替换为 HuggingFace 预训练的 \texttt{google/siglip-base-patch16-224} 的 ViT-B/16（86M 参数，全部冻结），仅训练 2 层 Transformer 文本编码器（$d=768$，12 头注意力）和 image adapter（线性层将 ViT 输出映射到共享空间）。图像预处理改用 SigLIP 归一化（mean=[0.5, 0.5, 0.5]，std=[0.5, 0.5, 0.5]）匹配预训练分布。
+\noindent \textbf{Exp19}：将图像编码器替换为 HuggingFace 预训练的 \texttt{google/siglip-base-patch16-224} 的 ViT-B/16（86M 参数，全部冻结），仅训练 2 层 Transformer 文本编码器（$d=768$，12 头注意力）和 image adapter（线性层将 ViT 输出映射到共享空间）。图像预处理改用 SigLIP 归一化（mean=[0.5, 0.5, 0.5]，std=[0.5, 0.5, 0.5]）匹配预训练分布。\\
 
-\textbf{Exp20}：进一步将文本编码器替换为预训练 DistilBERT-base-uncased（6 层，66M 参数），ViT 解冻顶层 3 层，DistilBERT 全部 6 层解冻。总可训练参数 88M，在 Flickr8k 仅 30K 训练对的情况下严重过拟合。
+\noindent \textbf{Exp20}：进一步将文本编码器替换为预训练 DistilBERT-base-uncased（6 层，66M 参数），ViT 解冻顶层 3 层，DistilBERT 全部 6 层解冻。总可训练参数 88M，在 Flickr8k 仅 30K 训练对的情况下严重过拟合。\\
 
-\textbf{Exp21（最优模型）}：采用部分解冻策略——ViT 仅解冻顶层 3 层（6M 参数），DistilBERT 仅解冻顶层 2 层（14M 参数），底层保持冻结保护预训练知识。配合差分学习率：ViT 顶层 LR=$1\times 10^{-5}$，DistilBERT 顶层 LR=$2\times 10^{-5}$，投影层 LR=$3\times 10^{-4}$。可训练参数从 88M 降至 36M，训练健康无过拟合。
+\noindent \textbf{Exp21（最优模型）}：采用部分解冻策略——ViT 仅解冻顶层 3 层（21M 参数），DistilBERT 仅解冻顶层 2 层（14M 参数），底层保持冻结保护预训练知识。配合差分学习率：ViT 顶层 LR=$1\times 10^{-5}$，DistilBERT 顶层 LR=$2\times 10^{-5}$，投影层 LR=$3\times 10^{-4}$。可训练参数从 88M 降至 36M，训练健康无过拟合。
 
 \subsection{检索评估方法}
 
@@ -250,7 +251,7 @@ Transformer & 24.81\% & 27.29\% & 45.92\% & 49.42\% & 56.67\% & 58.91\% \\
 \end{tabular}
 \end{table}
 
-\textbf{MLP vs Transformer 分析}：出乎意料的是，MLP 文本编码器的检索指标与 Transformer 基本持平，在 R@5/R@10 上甚至更优。这一现象在当前设定下是合理的：
+\noindent \textbf{MLP vs Transformer 分析}：出乎意料的是，MLP 文本编码器的检索指标与 Transformer 基本持平，在 R@5/R@10 上甚至更优。这一现象在当前设定下是合理的：
 
 \begin{enumerate}[nosep]
     \item \textbf{数据量不足}：Flickr8k 仅约 6000 对训练图文，Transformer 参数量远大于 MLP，更容易记忆训练样本而非学习泛化特征（MLP test\_loss=2.94 vs Transformer 3.91）；
@@ -258,7 +259,7 @@ Transformer & 24.81\% & 27.29\% & 45.92\% & 49.42\% & 56.67\% & 58.91\% \\
     \item \textbf{对比学习依赖关键词匹配}：在小规模对比学习框架下，模型最有效的策略是将视觉概念与关键词对齐，MLP 的均值池化天然适合这种模式。
 \end{enumerate}
 
-中期阶段的核心发现是\textbf{过拟合}——Transformer 训练 200 epoch 后 train\_loss 远低于 test\_loss，常数学习率无法在后期减小参数更新幅度。后续优化以此为出发点。
+\noindent 中期阶段的核心发现是\textbf{过拟合}——Transformer 训练 200 epoch 后 train\_loss 远低于 test\_loss，常数学习率无法在后期减小参数更新幅度。后续优化以此为出发点。
 
 \subsection{Phase II：从头训练优化（Exp0--18)}
 
@@ -388,11 +389,13 @@ Exp21 & \textbf{58.03} & \textbf{60.09} & 部分解冻双预训练 & 最终最�
 \textbf{实验} & \textbf{t2i\_R@5} & \textbf{i2t\_R@5} & \textbf{t2i\_R@10} & \textbf{i2t\_R@10} \\
 \midrule
 Exp0 & 45.77 & 44.26 & 56.72 & 56.47 \\
+\rowcolor{blue!15}
 Exp1 & 55.54 & 56.81 & 65.50 & 67.48 \\
 Exp2 & 31.27 & 33.31 & 43.08 & 44.92 \\
 Exp3 & 51.01 & 52.98 & 60.55 & 63.22 \\
 Exp4 & 57.07 & -- & 65.40 & -- \\
 Exp5 & 58.45 & 61.06 & 66.58 & 68.54 \\
+\rowcolor{yellow!30}
 Exp6 & 58.90 & 60.82 & 66.76 & 69.30 \\
 Exp7--8 & -- & -- & -- & -- \\
 Exp9 & 56.55 & 58.91 & 64.83 & 67.11 \\
@@ -405,8 +408,10 @@ Exp15 & 52.97 & 55.56 & 62.83 & 64.47 \\
 Exp16 & 54.94 & 57.60 & 64.93 & 66.81 \\
 Exp17 & 55.88 & 58.97 & 64.61 & 67.60 \\
 Exp18 & 55.07 & 57.78 & 64.68 & 67.17 \\
+\rowcolor{green!30}
 Exp19 & 72.54 & 74.92 & 80.70 & 82.43 \\
 Exp20 & 83.32 & 83.56 & 89.94 & 90.61 \\
+\rowcolor{orange!30}
 Exp21 & 83.71 & 84.77 & 90.53 & 90.52 \\
 \bottomrule
 \end{tabular}
@@ -437,7 +442,7 @@ t2i\_R@10 & 66.76\% & 80.70\% & 89.94\% & \textbf{90.53\%} \\
 i2t\_R@1 & 39.82\% & 49.97\% & 59.67\% & \textbf{60.09\%} \\
 i2t\_R@5 & 60.82\% & 74.92\% & 83.56\% & \textbf{84.77\%} \\
 i2t\_R@10 & 69.30\% & 82.43\% & 90.61\% & \textbf{90.52\%} \\
-test\_loss & -- & -- & 0.9669 & \textbf{0.9233} \\
+test\_loss & 3.5051 & 2.4841 & 0.9669 & \textbf{0.9233} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -521,7 +526,7 @@ Exp21 虽然在 t2i\_R@1 上略低于 Exp20（0.45pp），但 i2t\_R@1 更高，
 
 \subsection{Top-K 检索可视化}
 
-使用相同的查询文本 ``A little girl covered in paint sits in front of a painted rainbow''，对比两个最优模型的 Top-5 检索结果：
+使用相同的查询文本 ``A little girl covered in paint sits in front of a painted rainbow''，对比三个模型的 Top-5 检索结果：
 
 \begin{figure}[H]
 \centering
@@ -535,7 +540,13 @@ Exp21 虽然在 t2i\_R@1 上略低于 Exp20（0.45pp），但 i2t\_R@1 更高，
 \caption{Exp19（冻结预训练 ViT）文本→图像 Top-5 检索结果}
 \end{figure}
 
-两个模型的 Rank 1 图像均与查询描述高度相关。但 Exp19 的相似度分数（0.28--0.35）明显高于 Exp6（0.15--0.25），且检索结果的语义相关性更一致，反映了预训练视觉特征带来的嵌入空间质量提升。
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../viz_outputs/exp21_topk_query.png}
+\caption{Exp21（双预训练 + 部分解冻）文本→图像 Top-5 检索结果}
+\end{figure}
+
+三个模型的 Rank 1 图像均与查询描述高度相关。但相似度分数逐步提升：Exp6（0.15--0.25）$\rightarrow$ Exp19（0.28--0.35）$\rightarrow$ Exp21（0.30--0.40），反映了预训练特征带来的嵌入空间质量提升。Exp21 作为最终最优模型，其检索结果的语义相关性和分数一致性均优于前两者。
 
 \subsection{Bad Case 分析}
 
@@ -569,13 +580,28 @@ Exp21 虽然在 t2i\_R@1 上略低于 Exp20（0.45pp），但 i2t\_R@1 更高，
 \caption{Exp19 Bad Case \#2：GT 原图（rank=2085），反问句缺乏直接视觉线索}
 \end{figure}
 
+\subsubsection{Exp21（双预训练 + 部分解冻）的 Bad Case}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../viz_outputs/exp21_badcase_1.png}
+\caption{Exp21 Bad Case \#1：GT 原图（rank=1836），描述 ``A crowded street in Europe.'' 过于泛化，无法定位到特定街景}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../viz_outputs/exp21_badcase_2.png}
+\caption{Exp21 Bad Case \#2：GT 原图（rank=1209），描述涉及人群与多实体空间关系，模型难以精确对齐}
+\end{figure}
+
 \textbf{Bad Case 类型分析}：
 
 \begin{enumerate}
-    \item \textbf{模糊/抽象描述}：``I have no idea!'' 这类缺乏具体语义的文本无法提供有效检索线索。
-    \item \textbf{语义正确但非精确匹配}：查询 ``Two dogs play with each other outdoors''，检索结果也确实都是两只狗户外玩的场景，但 GT 原图被同类语义图像淹没。
-    \item \textbf{多实体组合描述}：``A boy rides a skateboard with a bike to his right'' 包含多实体空间关系，模型难以精确对齐。
-    \item \textbf{反问/隐含语义}：``Where is the rest of his racket?'' 需要推理能力，对当前模型仍构成挑战。
+    \item \textbf{模糊/抽象描述}：``I have no idea!''（Exp6 Bad Case）和 ``A crowded street in Europe.''（Exp21 Bad Case）这类缺乏具体语义的文本无法提供有效检索线索，GT 排名极低（2944 和 1836）。
+    \item \textbf{语义正确但非精确匹配}：查询 ``Two dogs play with each other outdoors''（Exp6 Bad Case），检索结果也确实都是两只狗户外玩的场景，但 GT 原图被同类语义图像淹没。
+    \item \textbf{多实体组合描述}：``A boy rides a skateboard with a bike to his right''（Exp19）和涉及人群多实体空间关系的描述（Exp21）均包含复杂的空间关系，模型难以精确对齐。
+    \item \textbf{反问/隐含语义}：``Where is the rest of his racket?''（Exp19）需要推理能力，对当前模型仍构成挑战。
+    \item \textbf{Exp21 Bad Case 排名更低}：值得注意的是，Exp21 最严重的 Bad Case 排名（1836）远低于 Exp6（2944）和 Exp19（2441/2085），说明双预训练模型对困难样本的检索能力虽有改善但仍有局限。
 \end{enumerate}
 
 \subsection{模型偏好与局限性总结}
@@ -663,7 +689,7 @@ ViT 剪枝1层 & $\sim$0\% & $\sim$0\% & 582.7 MB & -- & -- & 灾难性 \\
 \midrule
 模型 & Exp21 BF16/FP32 (自动检测 GPU) \\
 模型体积 & 305 MB (BF16) / 610 MB (FP32) \\
-预计算耗时 & $\sim$8min \\
+预计算耗时 & $\sim$30s (GPU BF16) / $\sim$6min (CPU FP32) \\
 检索延迟 & <50ms (dot product only) \\
 端口 & http://localhost:7861 \\
 启动命令 & \texttt{python app\_inference.py} \\
