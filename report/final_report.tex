@@ -9,6 +9,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{adjustbox}
 \usepackage[table]{xcolor}
 \usepackage{hyperref}
 \usepackage{listings}
@@ -345,6 +346,7 @@ Exp21 虽然在 t2i\_R@1 上略低于 Exp20（0.45pp），但 i2t\_R@1 更高，
 \begin{table}[H]
 \centering
 \caption{全部实验配置与测试集 Recall@1}
+\begin{adjustbox}{max width=\textwidth}
 \small
 \begin{tabular}{lrlll}
 \toprule
@@ -378,11 +380,13 @@ Exp20 & 58.48 & 59.67 & 双预训练+全解冻DB & 过拟合 \\
 Exp21 & \textbf{58.03} & \textbf{60.09} & 部分解冻双预训练 & 最终最优 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \end{table}
 
 \begin{table}[H]
 \centering
 \caption{全部实验测试集 Recall@5 和 Recall@10}
+\begin{adjustbox}{max width=\textwidth}
 \small
 \begin{tabular}{lrlll}
 \toprule
@@ -415,6 +419,7 @@ Exp20 & 83.32 & 83.56 & 89.94 & 90.61 \\
 Exp21 & 83.71 & 84.77 & 90.53 & 90.52 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \end{table}
 
 \subsection{最优模型训练过程分析}
@@ -584,14 +589,14 @@ Exp21 虽然在 t2i\_R@1 上略低于 Exp20（0.45pp），但 i2t\_R@1 更高，
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{../viz_outputs/exp21_badcase_1.png}
-\caption{Exp21 Bad Case \#1：GT 原图（rank=1836），描述 ``A crowded street in Europe.'' 过于泛化，无法定位到特定街景}
+\includegraphics[width=\textwidth]{../viz_outputs/exp21_badcase1_comparison.png}
+\caption{Exp21 Bad Case \#1：左边红框为 GT 原图（rank=1836），右边为模型 Top-5 检索结果——描述 ``A crowded street in Europe.'' 过于泛化，无法定位到特定街景}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{../viz_outputs/exp21_badcase_2.png}
-\caption{Exp21 Bad Case \#2：GT 原图（rank=1209），描述涉及人群与多实体空间关系，模型难以精确对齐}
+\includegraphics[width=\textwidth]{../viz_outputs/exp21_badcase2_comparison.png}
+\caption{Exp21 Bad Case \#2：左边红框为 GT 原图（rank=1209），右边为模型 Top-5 检索结果——描述涉及人群与多实体空间关系，模型难以精确对齐}
 \end{figure}
 
 \textbf{Bad Case 类型分析}：
@@ -703,13 +708,13 @@ ViT 剪枝1层 & $\sim$0\% & $\sim$0\% & 582.7 MB & -- & -- & 灾难性 \\
 
 \begin{figure}[H]
 \centering
-\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}[在此插入：Gradio\_WebUI\_Text\_to\_Image\_Screenshot.png]\vspace{3cm}}}
+\includegraphics[width=\textwidth]{figures/Gradio_WebUI_Text_to_Image_Screenshot.jpg}
 \caption{推理 Demo WebUI：文本搜图功能界面}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}[在此插入：Gradio\_WebUI\_Image\_to\_Text\_Screenshot.png]\vspace{3cm}}}
+\includegraphics[width=\textwidth]{figures/Gradio_WebUI_Image_to_Text_Screenshot.jpg}
 \caption{推理 Demo WebUI：图片搜文功能界面}
 \end{figure}
 

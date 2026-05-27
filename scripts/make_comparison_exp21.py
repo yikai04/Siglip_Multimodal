@@ -17,7 +17,8 @@ legend_elements = [mpatches.Patch(facecolor="none", edgecolor="#e74c3c", linewid
 output_dir = "viz_outputs"
 
 bad_cases = [
-    # Fill in after running viz_exp21.py
+    {"caption": "A crowded street in Europe .", "rank": 1836},
+    {"caption": "Large group of people , most setting down on a walkway with two boys standing up holding plates .", "rank": 1209},
 ]
 
 for i, bc in enumerate(bad_cases, 1):
@@ -40,7 +41,7 @@ for i, bc in enumerate(bad_cases, 1):
     axes[1].imshow(topk)
     axes[1].set_title("Model Top-5 Retrieved Results", fontsize=14, fontweight="bold")
     axes[1].axis("off")
-    caption_short = bc["caption"][:70] + "..." if len(bc["caption"]) > 70 else bc["caption"]
+    caption_short = bc["caption"][:90] + "..." if len(bc["caption"]) > 90 else bc["caption"]
     fig.suptitle(f"Exp21 Bad Case #{i}: \"{caption_short}\"", fontsize=14, fontweight="bold", color="#e74c3c", y=1.02)
     fig.legend(handles=legend_elements, loc="lower center", ncol=1, fontsize=12, frameon=True, fancybox=True)
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
