@@ -60,7 +60,7 @@
 \thispagestyle{fancy}
 
 \begin{abstract}
-本项目基于 SigLIP（Sigmoid Loss for Language-Image Pretraining）模型，在 Flickr8k 数据集上实现了一个小规模图文检索系统。与 CLIP 使用 softmax 进行全局归一化不同，SigLIP 对每个图文对独立使用 sigmoid 判断是否匹配，对 batch size 更鲁棒。本文详细介绍了模型实现、训练优化过程、实验结果分析及可视化。经过 19 组实验的系统性探索，最终最优模型（Exp19：冻结预训练 SigLIP ViT-B/16 + 可训练 Transformer 文本编码器）在测试集上取得了 t2i\_R@1=47.36\%、i2t\_R@1=49.97\% 的检索准确率，相比从头训练 ResNet18 的最优结果（Exp6，t2i\_R@1=36.65\%）提升 10.71 个百分点。
+本项目基于 SigLIP（Sigmoid Loss for Language-Image Pretraining）模型，在 Flickr8k 数据集上实现了一个小规模图文检索系统。与 CLIP 使用 softmax 进行全局归一化不同，SigLIP 对每个图文对独立使用 sigmoid 判断是否匹配，对 batch size 更鲁棒。本文详细介绍了模型实现、训练优化过程、实验结果分析及可视化。经过 19 组实验的系统性探索，从头训练 ResNet18 的天花板约为 t2i\_R@1=36.65\%（Exp6）。随后转向预训练模型：Exp19 仅引入预训练视觉编码器提升至 47.36\%；Exp20/21 进一步引入预训练 DistilBERT 文本编码器并采用部分解冻策略，最终最优模型（Exp21）取得 t2i\_R@1=58.03\%、i2t\_R@1=60.09\%，相比 Exp6 提升 21.38 个百分点。此外，本文对最优模型进行了推理优化实验：BF16 半精度推理实现 3.8$\times$ 加速且精度几乎无损，模型体积缩小 50\%；而层剪枝和 INT8 动态量化在无重训练条件下严重损害精度。
 \end{abstract}
 
 \tableofcontents
@@ -370,32 +370,57 @@ Exp0--18 均使用从头训练的 ResNet18 作为图像编码器，在 Flickr8k 
 
 结果：t2i\_R@1 从 36.65\% 跃升至 47.36\%，提升 10.71 个百分点，是所有实验中最大的单步改进。仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果，充分验证了预训练视觉特征的价值。
 
+\subsubsection{双预训练模型与部分解冻策略（Exp20/21）}
+
+Exp19 证明了预训练视觉编码器的价值，但文本编码器仍从头训练，限制了图文对齐的精度。Exp20 和 Exp21 进一步引入预训练 DistilBERT-base-uncased 作为文本编码器：
+
+\begin{table}[H]
+\centering
+\caption{预训练模型实验对比}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{实验} & \textbf{视觉编码器} & \textbf{文本编码器} & \textbf{解冻策略} & \textbf{可训练参数} \\
+\midrule
+Exp19 & 冻结 ViT-B/16 & 从头训练 Transformer & ViT 全冻结 & 18.7M \\
+Exp20 & ViT-B/16 顶层3层 & DistilBERT 全6层 & DistilBERT 全解冻 & 88.2M \\
+Exp21 & ViT-B/16 顶层3层 & DistilBERT 顶层2层 & 双方部分解冻 & 36.0M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Exp20 的过拟合问题}：DistilBERT 全部 6 层解冻（66M 可训练参数），在 Flickr8k 仅 30K 训练对的情况下严重过拟合——train\_loss 从 epoch 25 后持续下降，但 val\_loss 停滞在 0.94--0.96 并不再下降。
+
+\textbf{Exp21 的部分解冻策略}：借鉴 ViT 的经验，DistilBERT 也只解冻顶层 2 层（第5、6层），底层 4 层 + embeddings 保持冻结。可训练参数从 88M 降至 36M，减少 60\%。结果：test t2i\_R@1=58.03\%，虽然比 Exp20 的 58.48\% 低 0.45pp，但 i2t\_R@1 更高（60.09\% vs 59.67\%），test\_loss 更低（0.9233 vs 0.9669），训练全程无过拟合。
+
 %=======================================================================
 \section{最终结果}
 %=======================================================================
 
 \subsection{最优模型配置}
 
-最优模型为 Exp19（冻结预训练 ViT），配置如下：
+最优模型为 Exp21（双预训练 + 部分解冻），配置如下：
 
 \begin{table}[H]
 \centering
-\caption{最优模型（Exp19）训练配置}
+\caption{最优模型（Exp21）训练配置}
 \begin{tabular}{lc}
 \toprule
 \textbf{参数} & \textbf{值} \\
 \midrule
-图像编码器 & 冻结的 SigLIP ViT-B/16 (google/siglip-base-patch16-224) \\
-文本编码器 & Transformer (2L, 12H, embed\_dim=768), 从头训练 \\
+图像编码器 & SigLIP ViT-B/16 (底层9层+embeddings冻结, 顶层3层微调) \\
+文本编码器 & DistilBERT-base-uncased (底层4层+embeddings冻结, 顶层2层微调) \\
 嵌入维度 & 768 \\
-训练轮数 & 约 70 (含 resume) \\
-Batch size & 64 \\
-学习率 & 3e-4 \\
+训练轮数 & 50 \\
+Batch size & 32 \\
+ViT 顶层 LR & 1e-5 \\
+DistilBERT 顶层 LR & 2e-5 \\
+Projection/Loss LR & 3e-4 \\
 LR 调度 & Cosine Warmup (warmup\_ratio=0.1, min\_lr\_ratio=0.01) \\
-优化器 & AdamW (weight\_decay=1e-4) \\
+优化器 & AdamW (差分 weight\_decay) \\
 梯度裁剪 & max\_norm=1.0 \\
 数据增强 & Resize(224, BICUBIC) + HorizontalFlip + SigLIP 归一化 \\
-可训练参数 & 18.7M / 总 111.6M \\
+文本分词 & DistilBertTokenizerFast (vocab=30522, max\_len=64) \\
+可训练参数 & 36.0M / 总 159.8M \\
 GPU & NVIDIA RTX 4090 \\
 \bottomrule
 \end{tabular}
@@ -406,21 +431,24 @@ GPU & NVIDIA RTX 4090 \\
 \begin{table}[H]
 \centering
 \caption{模型性能对比}
-\begin{tabular}{lccc}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{指标} & \textbf{Exp19 (预训练ViT)} & \textbf{Exp6 (从头训练)} & \textbf{提升} \\
+\textbf{指标} & \textbf{Exp21 (双预训练)} & \textbf{Exp20 (全解冻)} & \textbf{Exp19 (单预训练)} & \textbf{Exp6 (从头训练)} \\
 \midrule
-t2i\_R@1 & \textbf{47.36\%} & 36.65\% & +10.71\% \\
-t2i\_R@5 & \textbf{72.54\%} & 58.90\% & +13.64\% \\
-t2i\_R@10 & \textbf{80.70\%} & 66.76\% & +13.94\% \\
-i2t\_R@1 & \textbf{49.97\%} & 39.82\% & +10.15\% \\
-i2t\_R@5 & \textbf{74.92\%} & 60.82\% & +14.10\% \\
-i2t\_R@10 & \textbf{82.43\%} & 69.30\% & +13.13\% \\
+t2i\_R@1 & \textbf{58.03\%} & 58.48\% & 47.36\% & 36.65\% \\
+t2i\_R@5 & \textbf{83.71\%} & 83.32\% & 72.54\% & 58.90\% \\
+t2i\_R@10 & \textbf{90.53\%} & 89.94\% & 80.70\% & 66.76\% \\
+i2t\_R@1 & \textbf{60.09\%} & 59.67\% & 49.97\% & 39.82\% \\
+i2t\_R@5 & \textbf{84.77\%} & 83.56\% & 74.92\% & 60.82\% \\
+i2t\_R@10 & \textbf{90.52\%} & 90.61\% & 82.43\% & 69.30\% \\
+test\_loss & \textbf{0.9233} & 0.9669 & - & - \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-与中期报告基线（常数 LR Transformer，t2i\_R@1=24.81\%）相比，最终最优模型提升了 22.55 个百分点。
+Exp21 虽然在 t2i\_R@1 上略低于 Exp20（0.45pp），但 i2t\_R@1 更高，test\_loss 更低（0.92 vs 0.97），训练过程无过拟合。综合来看，Exp21 是更稳健的最终模型。
+
+与中期报告基线（常数 LR Transformer，t2i\_R@1=24.81\%）相比，最终最优模型提升了 33.22 个百分点。
 
 \subsection{训练过程分析}
 
@@ -494,11 +522,25 @@ i2t\_R@10 & \textbf{82.43\%} & 69.30\% & +13.13\% \\
 \caption{Exp19 冻结预训练 ViT 模型（$t=62.59$, $b=-10.57$）}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../viz_outputs/exp21_logits_heatmap.png}
+    \caption{Logits 热力图}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{../viz_outputs/exp21_logits_heatmap_cosine.png}
+    \caption{余弦相似度热力图}
+\end{subfigure}
+\caption{Exp21 双预训练模型（$t=23.66$, $b=-11.53$）}
+\end{figure}
+
 \textbf{对比分析}：
 
 \begin{enumerate}[nosep]
-    \item \textbf{对角线 vs 非对角线}：三个模型的对角线（正样本对）均明显高于非对角线（负样本对），说明模型成功学习到了图文对齐能力。
-    \item \textbf{预训练模型优势}：HuggingFace 预训练模型的余弦相似度对角线值最高（约 0.35--0.45），非对角线更低（约 0.05--0.15），正负对比最鲜明。这得益于 ViT 图像编码器和大规模预训练。
+    \item \textbf{对角线 vs 非对角线}：四个模型的对角线（正样本对）均明显高于非对角线（负样本对），说明模型成功学习到了图文对齐能力。
+    \item \textbf{Exp21 的显著提升}：Exp21（双预训练 + 部分解冻）的余弦相似度对角线约 0.30--0.40，非对角线约 0.05--0.15，接近完全预训练模型的水平。预训练 DistilBERT 带来了更强的文本语义理解，$t=23.66$ 的温度系数较小但配合 $b=-11.53$ 的偏置仍产生清晰的正负区分。
     \item \textbf{Exp19 的中间位置}：Exp19（冻结预训练 ViT + 可训练文本编码器）的余弦相似度对角线约 0.25--0.35，非对角线约 0.05--0.15，介于预训练模型和从头训练模型之间。虽然视觉特征来自预训练 ViT，但文本编码器仍在 Flickr8k 上从头训练，限制了图文对齐的精度。
     \item \textbf{从头训练模型的局限}：本地模型的余弦相似度分布最紧凑（对角线约 0.20--0.28，非对角线约 0.05--0.15），正负样本区分度最低，反映了小数据集从头训练的局限。
     \item \textbf{SigLIP 缩放效果}：三个模型通过 $\text{logits} = t \cdot \cos\_sim + b$ 缩放后，对角线与非对角线的差异被显著放大。预训练模型因 $t$ 最大（117.33），logits 范围最广（约 $[-20, 40]$）；Exp19 的 $t=62.59$，logits 约 $[-10, 20]$；从头训练模型 $t=31.81$，logits 仅约 $[-5, 15]$。更大的温度系数对应更强的正负区分能力。
@@ -583,6 +625,52 @@ i2t\_R@10 & \textbf{82.43\%} & 69.30\% & +13.13\% \\
 \end{enumerate}
 
 %=======================================================================
+\section{推理速度优化实验}
+%=======================================================================
+
+最优模型（Exp21）总参数 159.8M，推理时需遍历 12 层 ViT + 6 层 DistilBERT。本节探索三种推理优化策略，评估精度与速度的权衡。
+
+\subsection{实验方法}
+
+\begin{enumerate}[nosep]
+    \item \textbf{半精度推理（FP16/BF16）}：将模型权重从 FP32 转换为 16 位浮点，利用 RTX 4090 的 Tensor Core 加速。SigLIPLoss 的 $\exp(t)$ 计算保持 FP32 以防止数值溢出。
+    \item \textbf{层剪枝}：直接删除 ViT/DistilBERT 的底层冻结层，减少 Transformer 前向传播步数。
+    \item \textbf{INT8 动态量化}：使用 PyTorch \texttt{quantize\_dynamic} 将 \texttt{nn.Linear} 层权重转为 INT8（仅支持 CPU 推理）。
+\end{enumerate}
+
+\subsection{实验结果}
+
+\begin{table}[H]
+\centering
+\caption{推理优化实验结果对比}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{方法} & \textbf{t2i\_R@1} & \textbf{i2t\_R@1} & \textbf{模型体积} & \textbf{延迟} & \textbf{加速比} & \textbf{精度损失} \\
+\midrule
+FP32 基线 & 58.03\% & 60.09\% & 609.7 MB & 7.68 ms & 1.0$\times$ & - \\
+BF16 & 58.01\% & 60.18\% & 304.9 MB & 2.01 ms & \textbf{3.8$\times$} & \textbf{0.02pp} \\
+FP16 & 57.96\% & 60.15\% & 304.9 MB & 2.10 ms & 3.7$\times$ & 0.07pp \\
+INT8 动态(冻结层) & 42.91\% & 42.13\% & 258.4 MB & 68.3 ms & 0.11$\times$ & -15.12pp \\
+ViT 剪枝1层 & $\sim$0\% & $\sim$0\% & 582.7 MB & 7.38 ms & 1.04$\times$ & 灾难性 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{结果分析}
+
+\textbf{BF16 半精度推理是最优方案}：在 RTX 4090（Ada Lovelace 架构）上，BF16 具有原生硬件支持，精度范围优于 FP16（避免 $\exp(t)$ 溢出风险）。BF16 实现：
+
+\begin{itemize}[nosep]
+    \item \textbf{3.8$\times$ 加速}：延迟从 7.68 ms/sample 降至 2.01 ms/sample；
+    \item \textbf{50\% 模型体积缩减}：609.7 MB → 304.9 MB；
+    \item \textbf{几乎无损精度}：t2i\_R@1 仅下降 0.02pp（58.03\% → 58.01\%），i2t\_R@1 甚至略有提升。
+\end{itemize}
+
+\textbf{层剪枝在无重训练条件下不可行}：预训练 ViT 的 12 层 encoder 形成顺序处理流水线——每层权重是在假定前序层已处理的条件下学习的。删除任何底层层导致后续层接收到未经预期的原始 embedding，产生灾难性精度崩溃（R@1 从 58\% 降至 $\sim$0\%）。这表明对预训练 Transformer，结构化剪枝必须伴随重训练或知识蒸馏才能生效。
+
+\textbf{INT8 动态量化精度损失严重}：冻结层量化后 t2i\_R@1 从 58.03\% 降至 42.91\%（-15.12pp），全量化更降至 36.48\%。此外，\texttt{quantize\_dynamic} 的 INT8 Linear 层仅在 CPU 上有效，GPU 上反而更慢（68 ms vs 基线 7.7 ms）。
+
+%=======================================================================
 \section{结论与改进方向}
 %=======================================================================
 
@@ -593,22 +681,25 @@ i2t\_R@10 & \textbf{82.43\%} & 69.30\% & +13.13\% \\
     \item ResNet width=48 + mild ColorJitter 是从头训练模型容量与泛化的最优平衡；
     \item Flickr8k 数据集对增强策略极度敏感——RandomResizedCrop、RandAugment、TrivialAugment 均严重损害性能；
     \item 更大模型容量（width=64、4L+8H+d512、MLP 投影头）在小数据集上从头训练反而导致过拟合；
-    \item 预训练视觉编码器是突破性能天花板的关键——Exp19 冻结 SigLIP ViT-B/16 后 t2i\_R@1 从 36.65\% 跃升至 47.36\%，仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果；
-    \item 最终最优模型 t2i\_R@1=47.36\%，相比中期基线提升 22.55 个百分点。
+    \item 预训练视觉编码器是突破性能天花板的关键——Exp19 冻结 SigLIP ViT-B/16 后 t2i\_R@1 从 36.65\% 跃升至 47.36\%；
+    \item 双预训练模型 + 部分解冻策略进一步提升——Exp21 在 ViT 和 DistilBERT 两端均只解冻顶层，可训练参数仅 36M，取得 t2i\_R@1=58.03\%、i2t\_R@1=60.09\%；
+    \item 部分解冻防止过拟合——Exp20 全解冻 DistilBERT（66M 可训练）导致过拟合，Exp21 只解冻顶层 2 层（14M 可训练）后训练更健康；
+    \item BF16 半精度推理是最有效的推理优化手段——3.8$\times$ 加速、50\% 体积缩减、几乎无损精度；
+    \item 层剪枝在无重训练条件下不可行——预训练 Transformer 的层间依赖使直接删除底层导致灾难性精度崩溃。
 \end{enumerate}
 
 \subsection{改进方向}
 
 \begin{enumerate}
-    \item \textbf{端到端微调预训练 ViT}：Exp19 冻结了视觉编码器，若解冻并在小学习率下微调，可能进一步提升视觉-文本对齐精度，但需注意过拟合风险。
+    \item \textbf{端到端微调预训练 ViT}：Exp19 冻结了视觉编码器，Exp21 已部分解冻顶层，可进一步尝试渐进式解冻（逐层递增解冻数量）以平衡精度与过拟合。
 
-    \item \textbf{预训练文本编码器}：当前文本编码器仍从头训练，可引入 BERT 等预训练语言模型初始化，提升文本语义理解能力，特别是对反问句和隐含语义的处理。
+    \item \textbf{更大规模数据集}：迁移到 Flickr30k（30000 张图）或 COCO（120000 张图），对比学习需要更多负样本对提供有效训练信号，也可尝试全解冻 DistilBERT。
 
-    \item \textbf{更大规模数据集}：迁移到 Flickr30k（30000 张图）或 COCO（120000 张图），对比学习需要更多负样本对提供有效训练信号。
-
-    \item \textbf{知识蒸馏}：用完整预训练 SigLIP 模型的输出作为软标签，指导本地模型学习更高质量的嵌入空间，可同时提升视觉和文本编码器。
+    \item \textbf{知识蒸馏 + 层剪枝}：层剪枝在无重训练下不可行，但若结合知识蒸馏（用完整模型指导剪枝后模型重训练），可能实现推理加速且保持精度。
 
     \item \textbf{Hard Negative Mining}：在训练中主动挖掘模型容易混淆的负样本对（如同类语义图像），提供更有针对性的训练信号，提升实例级区分能力。
+
+    \item \textbf{GPU 专用量化}：尝试 BitsAndBytes INT8 量化（HuggingFace 推荐方案）或 torch.compile()，可能提供超越 FP16/BF16 的进一步加速。
 \end{enumerate}
 
 %=======================================================================
