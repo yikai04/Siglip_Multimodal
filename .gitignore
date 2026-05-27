@@ -37,3 +37,4 @@ viz_outputs/*.png
 viz_outputs/*.jpg
 
 # Claude internal
+.claude/
