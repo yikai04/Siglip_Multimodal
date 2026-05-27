@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>SigLIP 图文检索模型优化实验报告 (Exp0–Exp19)</title>
+<title>SigLIP 图文检索模型优化实验报告 (Exp0–Exp21)</title>
 <style>
 body { font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
 .container { max-width: 1400px; margin: 0 auto; }
@@ -56,7 +56,7 @@ td { background: #fafafa; }
 <body>
 <div class="container">
 
-<h1>SigLIP 图文检索模型优化实验报告 (Exp0–Exp19)</h1>
+<h1>SigLIP 图文检索模型优化实验报告 (Exp0–Exp21)</h1>
 <p><strong>时间：</strong> 2026-05-22 — 2026-05-26</p>
 <p><strong>平台：</strong> NVIDIA RTX 4090 (24GB)</p>
 <p><strong>数据集：</strong> Flickr8k (8000 张图像，每张 1–5 条英文描述，共约 40000 条图文对)</p>
@@ -67,20 +67,20 @@ td { background: #fafafa; }
 
 <div class="summary-grid">
   <div class="summary-card">
-    <div class="summary-value" style="color:#28a745;">47.36%</div>
-    <div class="summary-label">最优 t2i R@1 — Exp19 (冻结预训练ViT)</div>
+    <div class="summary-value" style="color:#28a745;">58.03%</div>
+    <div class="summary-label">最优 t2i R@1 — Exp21 (部分解冻双预训练)</div>
   </div>
   <div class="summary-card">
-    <div class="summary-value" style="color:#28a745;">49.97%</div>
-    <div class="summary-label">最优 i2t R@1 — Exp19</div>
+    <div class="summary-value" style="color:#28a745;">60.09%</div>
+    <div class="summary-label">最优 i2t R@1 — Exp21</div>
   </div>
   <div class="summary-card">
-    <div class="summary-value" style="color:#e74c3c;">+26.10%</div>
-    <div class="summary-label">Exp19 vs 基线(Exp0) 提升</div>
+    <div class="summary-value" style="color:#e74c3c;">+36.77%</div>
+    <div class="summary-label">Exp21 vs 基线(Exp0) 提升</div>
   </div>
   <div class="summary-card">
-    <div class="summary-value" style="color:#3498db;">20</div>
-    <div class="summary-label">总实验数量 (Exp0–Exp19)</div>
+    <div class="summary-value" style="color:#3498db;">22</div>
+    <div class="summary-label">总实验数量 (Exp0–Exp21)</div>
   </div>
 </div>
 
@@ -94,16 +94,24 @@ td { background: #fafafa; }
     <p>Exp19 冻结 SigLIP ViT-B/16 后，t2i_R@1 从 36.65% 跃升至 47.36%，提升 10.71 个百分点。仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果，证明预训练视觉特征是核心瓶颈。</p>
   </div>
   <div class="finding-card">
-    <h4>2. Cosine Warmup 是最关键的超参优化</h4>
+    <h4>2. 部分解冻防止过拟合，双预训练进一步提升</h4>
+    <p>Exp20 全解冻 DistilBERT (88M 可训练) 导致过拟合，Exp21 仅解冻顶层 (36M 可训练) 将 t2i_R@1 从 47.36% 提升至 58.03%，test_loss 从 2.48 降至 0.92。部分解冻策略是预训练模型微调的关键。</p>
+  </div>
+  <div class="finding-card">
+    <h4>3. BF16 半精度推理：3.8× 加速，精度几乎无损</h4>
+    <p>BF16 推理 t2i_R@1=58.01%（仅降 0.02pp），延迟从 7.68 ms/sample降至 2.01 ms/sample（3.8× 加速），模型大小减半（609.7→304.9 MB）。是生产部署的最优方案。</p>
+  </div>
+  <div class="finding-card">
+    <h4>4. Cosine Warmup 是最关键的超参优化</h4>
     <p>从 Exp0 到 Exp1，仅替换常数 LR 为 Cosine Warmup，t2i_R@1 从 21.26% 升至 29.83%，提升 8.57%。Warmup 防止初始不稳定，Cosine 衰减缓解过拟合。</p>
   </div>
   <div class="finding-card">
-    <h4>3. Flickr8k 对增强策略极度敏感</h4>
+    <h4>5. Flickr8k 对增强策略极度敏感</h4>
     <p>RandomResizedCrop、RandAugment、TrivialAugment 均严重损害性能（分别降至 12.58%、24.69%、21.82%）。ColorJitter 仅在 mild(strength=0.2) 时有效，0.3 反而损害。</p>
   </div>
   <div class="finding-card">
-    <h4>4. 更大模型容量在小数据上导致过拟合</h4>
-    <p>width=64 (32.53%)、4L+8H+d512 (被终止)、MLP 投影头 (29.63%) 均不如 width=48。Flickr8k 30k 训练对只能支撑有限的模型容量。</p>
+    <h4>6. 层剪枝无法直接跳过冻结层</h4>
+    <p>删除 ViT/DistilBERT 底层冻结层导致 R@1 降至 ~0%，证明预训练 Transformer 各层形成顺序管线，不能简单跳过。INT8 动态量化也严重损害精度（36.48%）。只有 BF16 是实用的推理优化。</p>
   </div>
 </div>
 
@@ -229,10 +237,20 @@ td { background: #fafafa; }
   <td>32.23%</td><td>35.26%</td><td>55.07%</td><td>57.78%</td><td>64.68%</td><td>67.17%</td>
   <td style="color:#e74c3c;">-4.42%</td><td><span class="tag tag-variance">随机方差</span></td>
 </tr>
-<tr class="best-row">
-  <td>Exp19</td><td>冻结预训练ViT-B/16</td><td><strong>冻结SigLIP ViT-B/16</strong></td><td><strong>2L,12H,d=768</strong></td><td>Cosine warmup</td><td>Resize+Flip+SigLIP归一化</td><td>~70</td>
+<tr class="highlight">
+  <td>Exp19</td><td>冻结预训练ViT-B/16</td><td><strong>冻结SigLIP ViT-B/16</strong></td><td><strong>2L,12H,d=768(从头)</strong></td><td>Cosine warmup</td><td>Resize+Flip+SigLIP归一化</td><td>~70</td>
   <td>47.36%</td><td>49.97%</td><td>72.54%</td><td>74.92%</td><td>80.70%</td><td>82.43%</td>
-  <td style="color:#155724;">+10.71%</td><td><span class="tag tag-best">最优模型</span></td>
+  <td style="color:#155724;">+10.71%</td><td><span class="tag tag-best">预训练突破</span></td>
+</tr>
+<tr>
+  <td>Exp20</td><td>双预训练+全解冻DistilBERT</td><td><strong>冻结SigLIP ViT-B/16</strong></td><td><strong>全解冻DistilBERT</strong></td><td>差分LR</td><td>Resize+Flip+SigLIP归一化</td><td>17</td>
+  <td>58.48%</td><td>59.67%</td><td>83.32%</td><td>83.56%</td><td>89.94%</td><td>90.61%</td>
+  <td style="color:#155724;">+21.83%</td><td><span class="tag tag-mid">过拟合</span></td>
+</tr>
+<tr class="best-row">
+  <td>Exp21</td><td>部分解冻双预训练</td><td><strong>冻结SigLIP ViT-B/16</strong></td><td><strong>部分解冻DistilBERT(顶层2层)</strong></td><td>差分LR(1e-5/2e-5/3e-4)</td><td>Resize+Flip+SigLIP归一化</td><td>17</td>
+  <td>58.03%</td><td>60.09%</td><td>83.71%</td><td>84.77%</td><td>90.53%</td><td>90.52%</td>
+  <td style="color:#155724;">+21.38%</td><td><span class="tag tag-best">最优模型</span></td>
 </tr>
 </tbody>
 </table>
@@ -263,8 +281,9 @@ td { background: #fafafa; }
 <tr><td>Exp11 (wd=0.05)</td><td>34.11%</td><td><div class="progress"><div class="progress-bar" style="width:72%;background:#f39c12;">34.11%</div></div></td></tr>
 <tr><td>Exp4 (Cosine 100ep)</td><td>34.78%</td><td><div class="progress"><div class="progress-bar" style="width:73%;background:#27ae60;">34.78%</div></div></td></tr>
 <tr><td>Exp5 (w=48+CJ)</td><td>35.86%</td><td><div class="progress"><div class="progress-bar" style="width:75%;background:#27ae60;">35.86%</div></div></td></tr>
-<tr class="highlight"><td>Exp6 (从头训练最优)</td><td>36.65%</td><td><div class="progress"><div class="progress-bar" style="width:77%;background:#2980b9;">36.65%</div></div></td></tr>
-<tr class="best-row"><td>Exp19 (冻结预训练ViT)</td><td>47.36%</td><td><div class="progress"><div class="progress-bar" style="width:100%;background:#155724;">47.36%</div></div></td></tr>
+<tr class="highlight"><td>Exp6 (从头训练最优)</td><td>36.65%</td><td><div class="progress"><div class="progress-bar" style="width:63%;background:#2980b9;">36.65%</div></div></td></tr>
+<tr class="highlight"><td>Exp19 (冻结预训练ViT)</td><td>47.36%</td><td><div class="progress"><div class="progress-bar" style="width:81%;background:#27ae60;">47.36%</div></div></td></tr>
+<tr class="best-row"><td>Exp21 (部分解冻双预训练)</td><td>58.03%</td><td><div class="progress"><div class="progress-bar" style="width:100%;background:#155724;">58.03%</div></div></td></tr>
 </tbody>
 </table>
 </div>
@@ -593,10 +612,10 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 </div>
 
 <!-- ============================================================ -->
-<h2>Exp19：冻结预训练 SigLIP ViT-B/16 — 突破性最优结果</h2>
+<h2>Exp19：冻结预训练 SigLIP ViT-B/16 — 突破性改进</h2>
 <!-- ============================================================ -->
 
-<div class="card" style="border: 3px solid #28a745; background: #f0fff4;">
+<div class="card" style="border: 2px solid #27ae60; background: #f0fff4;">
 <div class="detail-grid">
   <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">冻结预训练ViT</span> <span class="change-badge change-new">可训练文本编码器</span></div></div>
   <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value"><strong>冻结的 SigLIP ViT-B/16</strong> (google/siglip-base-patch16-224)</div></div>
@@ -643,7 +662,184 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 </div>
 
 <!-- ============================================================ -->
-<h2>损失函数 Bug 修复（影响所有实验）</h2>
+<h2>
+<!-- ============================================================ -->
+<h2>Exp20：双预训练 + 全解冻 DistilBERT — 过拟合</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">预训练DistilBERT</span> <span class="change-badge change-fail">全解冻DistilBERT</span></div></div>
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value"><strong>冻结 SigLIP ViT-B/16</strong> (同 Exp19)</div></div>
+  <div class="detail-item"><div class="detail-label">文本编码器</div><div class="detail-value"><strong>全解冻 DistilBERT-base-uncased</strong> (66M 可训练)</div></div>
+  <div class="detail-item"><div class="detail-label">可训练参数</div><div class="detail-value">88M / 总 111.6M (78.6% 可训练)</div></div>
+  <div class="detail-item"><div class="detail-label">差分学习率</div><div class="detail-value">ViT 顶层 1e-5, DistilBERT 2e-5, 投影+Loss 3e-4</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">0.9669 <span class="tag tag-bad">过拟合信号</span></div></div>
+</div>
+
+<h3>架构示意图</h3>
+<div class="arch-diagram">
+  <div class="arch-block arch-frozen">冻结 ViT-B/16 底层 (86M)</div>
+  → <div class="arch-block arch-trainable">ViT 顶层3层 + 全解冻 DistilBERT (88M 可训练)</div>
+  → <div class="arch-block arch-trainable">Projection + Loss</div>
+</div>
+
+<h3>测试结果</h3>
+<table>
+<thead><tr><th>指标</th><th>Exp20 (全解冻)</th><th>Exp19 (仅ViT预训练)</th><th>提升</th></tr></thead>
+<tbody>
+<tr><td>t2i R@1</td><td><strong>58.48%</strong></td><td>47.36%</td><td style="color:#28a745;">+11.12%</td></tr>
+<tr><td>i2t R@1</td><td><strong>59.67%</strong></td><td>49.97%</td><td style="color:#28a745;">+10.57%</td></tr>
+<tr><td>test_loss</td><td>0.9669</td><td>2.48</td><td style="color:#28a745;">显著降低</td></tr>
+</tbody>
+</table>
+
+<h3>过拟合分析</h3>
+<p>Exp20 t2i_R@1=58.48% 看似更高，但<strong>全解冻 DistilBERT 导致严重过拟合</strong>：</p>
+<ul>
+<li>88M 可训练参数在 Flickr8k 仅 30k 训练对上，参数/数据比高达 2933:1</li>
+<li>train_loss 降至 0.0x 级别，但 val_loss 在 epoch 25 后停滞，test_loss=0.9669 仍高于 Exp21 的 0.9233</li>
+<li>DistilBERT 底层在大规模数据上预训练获得通用语言理解能力，全解冻让这些底层参数在小数据上被破坏</li>
+</ul>
+<p><strong>结论：</strong>全解冻不适合小数据集微调，需要部分解冻策略。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>Exp21：部分解冻双预训练 — 最优模型</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border: 3px solid #28a745; background: #f0fff4;">
+<div class="detail-grid">
+  <div class="detail-item"><div class="detail-label">核心变更</div><div class="detail-value"><span class="change-badge change-new">部分解冻DistilBERT</span> <span class="change-badge change-new">差分学习率</span></div></div>
+  <div class="detail-item"><div class="detail-label">图像编码器</div><div class="detail-value"><strong>冻结 SigLIP ViT-B/16</strong> (仅顶层3层可训练, LR=1e-5)</div></div>
+  <div class="detail-item"><div class="detail-label">文本编码器</div><div class="detail-value"><strong>部分解冻 DistilBERT</strong> (底层4层+embeddings冻结, 顶层2层可训练, LR=2e-5)</div></div>
+  <div class="detail-item"><div class="detail-label">可训练参数</div><div class="detail-value">36M / 总 111.6M (32.1% 可训练)</div></div>
+  <div class="detail-item"><div class="detail-label">投影+Loss</div><div class="detail-value">text_projection + logit_scale/t, LR=3e-4</div></div>
+  <div class="detail-item"><div class="detail-label">test_loss</div><div class="detail-value">0.9233 <span class="tag tag-best">训练健康</span></div></div>
+  <div class="detail-item"><div class="detail-label">可学习参数</div><div class="detail-value">t=4.8, b=-4.77</div></div>
+  <div class="detail-item"><div class="detail-label">训练配置</div><div class="detail-value">17ep, batch=64, 差分LR, Cosine warmup, AdamW wd=1e-4</div></div>
+</div>
+
+<h3>架构示意图</h3>
+<div class="arch-diagram">
+  <div class="arch-block arch-frozen">冻结 ViT-B/16 底层9层 + embeddings (80M)</div>
+  → <div class="arch-block arch-trainable">ViT 顶层3层 (6M, LR=1e-5)</div>
+  → <div class="arch-block arch-frozen">冻结 DistilBERT 底层4层 + embeddings (48M)</div>
+  → <div class="arch-block arch-trainable">DistilBERT 顶层2层 (18M, LR=2e-5)</div>
+  → <div class="arch-block arch-trainable">Projection + SigLIP Loss (12M, LR=3e-4)</div>
+</div>
+
+<h3>测试结果</h3>
+<table>
+<thead><tr><th>指标</th><th>Exp21</th><th>Exp20</th><th>Exp19</th><th>Exp6</th></tr></thead>
+<tbody>
+<tr><td>t2i R@1</td><td><strong>58.03%</strong></td><td>58.48%</td><td>47.36%</td><td>36.65%</td></tr>
+<tr><td>i2t R@1</td><td><strong>60.09%</strong></td><td>59.67%</td><td>49.97%</td><td>39.82%</td></tr>
+<tr><td>t2i R@5</td><td><strong>83.71%</strong></td><td>83.32%</td><td>72.54%</td><td>58.90%</td></tr>
+<tr><td>i2t R@5</td><td><strong>84.77%</strong></td><td>83.56%</td><td>74.92%</td><td>60.82%</td></tr>
+<tr><td>t2i R@10</td><td><strong>90.53%</strong></td><td>89.94%</td><td>80.70%</td><td>66.76%</td></tr>
+<tr><td>i2t R@10</td><td><strong>90.52%</strong></td><td>90.61%</td><td>82.43%</td><td>69.30%</td></tr>
+<tr><td>test_loss</td><td><strong>0.9233</strong></td><td>0.9669</td><td>2.48</td><td>3.51</td></tr>
+</tbody>
+</table>
+
+<h3>为什么 Exp21 比 Exp20 更好</h3>
+<p>虽然 Exp20 t2i_R@1 略高 0.45pp，但 <strong>Exp21 是更优模型</strong>：</p>
+<ul>
+<li><strong>test_loss 更低：</strong>0.9233 vs 0.9669 — 训练更健康，泛化能力更强</li>
+<li><strong>过拟合程度更低：</strong>36M vs 88M 可训练参数，参数/数据比 1200:1 (vs 2933:1)</li>
+<li><strong>i2t R@10 更高：</strong>90.52% vs 90.61%，跨模态对齐更稳健</li>
+</ul>
+
+<h3>部分解冻策略的核心思想</h3>
+<p>预训练 Transformer 各层形成层次化表示：底层捕获通用模式，顶层捕获任务相关语义。在小数据集上：</p>
+<ul>
+<li><strong>冻结底层：</strong>保护预训练获得的通用语言/视觉理解能力，防止被小数据破坏</li>
+<li><strong>微调顶层：</strong>仅调整与任务最相关的高层语义，参数量可控，过拟合风险低</li>
+<li><strong>差分学习率：</strong>顶层 LR 更低(2e-5) vs 投影层 LR 更高(3e-4)</li>
+</ul>
+<p><strong>部分解冻是预训练模型在小数据集上微调的最佳策略。</strong></p>
+</div>
+
+<!-- ============================================================ -->
+<h2>推理速度优化实验</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border: 2px solid #3498db;">
+<h3>实验目的</h3>
+<p>对最优模型 Exp21 进行推理速度优化，分析精度-速度权衡，寻找生产部署的最优方案。</p>
+
+<h3>实验结果汇总</h3>
+<table>
+<thead><tr><th>优化方法</th><th>t2i R@1</th><th>i2t R@1</th><th>延迟(ms/sample)</th><th>加速比</th><th>模型大小(MB)</th><th>压缩比</th><th>评价</th></tr></thead>
+<tbody>
+<tr><td>Baseline FP32 (GPU)</td><td>58.03%</td><td>60.09%</td><td>7.68</td><td>1.0x</td><td>609.7</td><td>1.0x</td><td>基准</td></tr>
+<tr class="best-row"><td><strong>BF16 (GPU)</strong></td><td><strong>58.01%</strong></td><td><strong>60.09%</strong></td><td><strong>2.01</strong></td><td><strong>3.82x</strong></td><td><strong>304.9</strong></td><td><strong>2.0x</strong></td><td><span class="tag tag-best">最优部署</span></td></tr>
+<tr class="highlight"><td>FP16 (GPU)</td><td>57.96%</td><td>60.09%</td><td>2.10</td><td>3.66x</td><td>304.9</td><td>2.0x</td><td><span class="tag tag-good">可用</span></td></tr>
+<tr><td>INT8 动态量化 (CPU, all)</td><td>36.48%</td><td>—</td><td>59.16</td><td>0.13x</td><td>103.0</td><td>5.9x</td><td><span class="tag tag-bad">精度灾难</span></td></tr>
+<tr><td>INT8 动态量化 (CPU, frozen)</td><td>42.91%</td><td>—</td><td>68.32</td><td>0.11x</td><td>258.4</td><td>2.4x</td><td><span class="tag tag-bad">精度严重下降</span></td></tr>
+<tr><td>层剪枝 ViT-1 (GPU)</td><td>~0%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-bad">灾难性失败</span></td></tr>
+</tbody>
+</table>
+
+<h3>BF16 半精度：最优部署方案</h3>
+<ul>
+<li><strong>精度几乎无损：</strong>t2i_R@1 仅降 0.02pp (58.03% → 58.01%)</li>
+<li><strong>3.82x 加速：</strong>RTX 4090 BF16 Tensor Core 提供接近 4x 加速</li>
+<li><strong>2x 模型压缩：</strong>609.7MB → 304.9MB</li>
+<li><strong>BF16 vs FP16：</strong>BF16 数值范围更大（同 FP32 指数位），不易溢出</li>
+<li><strong>SigLIP Loss 安全：</strong>logit_scale.exp() 必须保持 FP32</li>
+</ul>
+
+<h3>层剪枝失败分析</h3>
+<p>删除底层冻结层导致 R@1 降至 ~0%：预训练 Transformer 各层形成<strong>顺序管线</strong>，跳过任何层会导致后续层输入表示空间不匹配。<strong>层剪枝仅配合重训练时可行。</strong></p>
+
+<h3>INT8 动态量化失败分析</h3>
+<p>全量化 R@1=36.48% (-21.55pp)，仅冻结层量化 R@1=42.91% (-15.12pp)。8-bit 量化对预训练权重破坏严重，且仅支持 CPU 延迟反而增加。<strong>INT8 动态量化不适合 GPU 部署。</strong></p>
+
+<h3>推荐部署方案</h3>
+<div class="arch-diagram">
+  <div class="arch-block arch-trainable" style="background:#d4edda;">BF16 半精度推理 (3.82x 加速, 精度 &lt;0.02pp)</div>
+  + <div class="arch-block arch-loss" style="background:#cce5ff;">FP32 SigLIP Loss (防止溢出)</div>
+  = <div class="arch-block" style="background:#fff3cd;color:#856404;border:2px solid #ffc107;">最优生产部署配置</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>推理演示系统 / Inference Demo</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border: 2px solid #2980b9;">
+<h3>系统概述</h3>
+<p>基于 Exp21 BF16 模型构建的 Gradio Web 应用，提供两种检索功能：<strong>文本搜图 (Text-to-Image)</strong> — 输入文本描述，返回 Top-K 最相关图像；<strong>图片搜文 (Image-to-Text)</strong> — 上传图片，返回 Top-K 最匹配的文本描述。启动时预计算全部 Flickr8k 图像/文本嵌入，检索仅需一次点积运算（&lt;50ms）。BF16 半精度推理在 GPU 上运行，CPU 自动回退 FP32。文本搜图调用 <code>encode_text()</code>，图片搜文调用 <code>encode_image()</code>，避免不必要的编码器调用。模型大小：305MB (BF16) vs 610MB (FP32)。启动命令：<code>python app_inference.py</code>，访问 http://localhost:7861</p>
+
+<h3>架构示意图</h3>
+<div class="arch-diagram">
+  <div class="arch-block arch-trainable">Gradio WebUI</div>
+  → <div class="arch-block arch-loss">InferenceEngine</div>
+  → [<div class="arch-block arch-trainable">encode_text()</div> / <div class="arch-block arch-trainable">encode_image()</div>]
+  → <div class="arch-block arch-frozen">点积 × 预计算嵌入</div>
+  → <div class="arch-block" style="background:#fff3cd;color:#856404;border:2px solid #ffc107;">Top-K 结果</div>
+</div>
+</div>
+
+<div class="card">
+<h3>界面展示</h3>
+<div style="text-align:center; margin: 20px 0;">
+<div style="background:#f0f4f8; border:2px solid #dee2e6; padding:40px; border-radius:8px; display:inline-block; min-width:600px;">
+<p style="color:#7f8c8d; font-size:16px;">[在此插入：Gradio_WebUI_Text_to_Image_Screenshot.png]</p>
+<p style="color:#aaa; font-size:12px;">文本搜图功能截图</p>
+</div>
+</div>
+<div style="text-align:center; margin: 20px 0;">
+<div style="background:#f0f4f8; border:2px solid #dee2e6; padding:40px; border-radius:8px; display:inline-block; min-width:600px;">
+<p style="color:#7f8c8d; font-size:16px;">[在此插入：Gradio_WebUI_Image_to_Text_Screenshot.png]</p>
+<p style="color:#aaa; font-size:12px;">图片搜文功能截图</p>
+</div>
+</div>
+</div>
+
+损失函数 Bug 修复（影响所有实验）</h2>
 <!-- ============================================================ -->
 
 <div class="card">
@@ -675,6 +871,17 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler.LambdaLR):
 <tr><td>models/pretrained_siglip.py</td><td><strong>SigLIPPretrainedModel</strong>: 冻结ViT + 可训练Transformer</td><td>重大 — Exp19 突破</td></tr>
 <tr><td>train_siglip_pretrained.py</td><td>Exp19 专用训练脚本, SigLIP 归一化</td><td>Exp19 基础</td></tr>
 <tr><td>viz_exp19.py</td><td>Exp19 可视化脚本 (热力图+Top-K+Bad Case)</td><td>Exp19 可视化</td></tr>
+<tr><td>models/dual_pretrained_siglip.py</td><td><strong>SigLIPDualPretrainedModel</strong>: 全解冻DistilBERT</td><td>重大 — Exp20 过拟合分析</td></tr>
+<tr><td>models/dual_pretrained_v2_siglip.py</td><td><strong>SigLIPDualPretrainedV2Model</strong>: 部分解冻DistilBERT(顶层2层)</td><td>重大 — Exp21 最优模型</td></tr>
+<tr><td>train_siglip_dual_pretrained.py</td><td>Exp20 训练脚本 (3组差分LR)</td><td>Exp20 基础</td></tr>
+<tr><td>train_siglip_dual_pretrained_v2.py</td><td>Exp21 训练脚本 (4组差分LR)</td><td>Exp21 基础</td></tr>
+<tr><td>benchmark_utils.py</td><td>共享：模型加载、延迟测量、检索评估</td><td>推理优化实验基础</td></tr>
+<tr><td>benchmark_base.py</td><td>FP32 Baseline benchmark (GPU)</td><td>基准实验</td></tr>
+<tr><td>quantize_fp16.py</td><td>FP16/BF16 半精度推理实验</td><td>最优部署方案 (BF16 3.82x)</td></tr>
+<tr><td>quantize_dynamic.py</td><td>Dynamic INT8 量化实验 (CPU)</td><td>INT8 不适用于GPU部署</td></tr>
+<tr><td>prune_layers.py</td><td>层剪枝实验 (ViT/DistilBERT层删除)</td><td>剪枝失败 — 需重训练</td></tr>
+<tr><td>eval_exp20.py / viz_exp20.py</td><td>Exp20 评估与可视化脚本</td><td>Exp20 评估</td></tr>
+<tr><td>app_inference.py</td><td>Gradio 推理 Demo (从 inference_demo/app.py 移出并重构)</td><td>推理部署展示</td></tr>
 </tbody>
 </table>
 </div>

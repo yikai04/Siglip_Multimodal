@@ -11,10 +11,7 @@ from PIL import Image
 from typing import List, Tuple, Optional
 from torchvision import transforms
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import MODEL_NAME, DEVICE
+from ..config import MODEL_NAME, DEVICE
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,1 @@
+"""Gradio visualization demo for pretrained SigLIP model."""

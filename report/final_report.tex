@@ -671,6 +671,66 @@ ViT 剪枝1层 & $\sim$0\% & $\sim$0\% & 582.7 MB & 7.38 ms & 1.04$\times$ & 灾
 \textbf{INT8 动态量化精度损失严重}：冻结层量化后 t2i\_R@1 从 58.03\% 降至 42.91\%（-15.12pp），全量化更降至 36.48\%。此外，\texttt{quantize\_dynamic} 的 INT8 Linear 层仅在 CPU 上有效，GPU 上反而更慢（68 ms vs 基线 7.7 ms）。
 
 %=======================================================================
+\section{推理演示系统}
+%=======================================================================
+
+基于 Exp21 BF16 模型，我们开发了一个基于 Gradio 的交互式图文检索演示系统，将训练好的最优模型落地为可实际使用的应用。
+
+\subsection{系统架构}
+
+推理 Demo 的核心是 InferenceEngine 类，它封装了模型加载、预计算和检索功能：
+
+\begin{enumerate}[nosep]
+    \item \textbf{启动时预计算}：编码 Flickr8k 全部 3290 张图像和对应 caption 的 embedding，存入内存；
+    \item \textbf{检索时仅做 dot product}：输入查询后，只需与预计算的 embedding 矩阵做一次点积即可得到 Top-K 结果，检索延迟 <50ms；
+    \item \textbf{分离编码器}：文本搜图仅调用 \texttt{encode\_text()}，图片搜文仅调用 \texttt{encode\_image()}，避免运行另一半编码器的无用计算。
+\end{enumerate}
+
+\subsection{功能}
+
+演示系统提供两个核心功能：
+
+\begin{enumerate}
+    \item \textbf{文本搜图 (Text → Image)}：输入任意英文文本描述，从 Flickr8k 中检索 Top-K 最相关图像，以 Gallery 形式展示，每张图附带余弦相似度分数和 caption；
+    \item \textbf{图片搜文 (Image → Text)}：上传任意图片，检索 Top-K 最匹配的文本描述，以表格形式展示 Rank、Caption 和 Cosine Score。
+\end{enumerate}
+
+\subsection{部署配置}
+
+\begin{table}[H]
+\centering
+\caption{推理 Demo 部署配置}
+\begin{tabular}{lc}
+\toprule
+\textbf{参数} & \textbf{值} \\
+\midrule
+模型 & Exp21 BF16/FP32 (自动检测 GPU) \\
+模型体积 & 305 MB (BF16) / 610 MB (FP32) \\
+预计算耗时 & $\sim$8min (GPU) / $\sim$8min (CPU) \\
+检索延迟 & <50ms (dot product only) \\
+端口 & http://localhost:7861 \\
+启动命令 & \texttt{python app\_inference.py} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+系统在启动时自动检测 GPU：有 GPU 且支持 BF16（Ampere+架构）时启用 BF16 加速推理（体积 305 MB），否则使用 FP32 正常推理（体积 610 MB）。这一设计确保 Demo 在服务器和普通 CPU 电脑上均可运行。
+
+\subsection{界面展示}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}[在此插入：Gradio\_WebUI\_Text\_to\_Image\_Screenshot.png]\vspace{3cm}}}
+\caption{推理 Demo WebUI：文本搜图功能界面}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}[在此插入：Gradio\_WebUI\_Image\_to\_Text\_Screenshot.png]\vspace{3cm}}}
+\caption{推理 Demo WebUI：图片搜文功能界面}
+\end{figure}
+
+%=======================================================================
 \section{结论与改进方向}
 %=======================================================================
 
@@ -765,35 +825,28 @@ def evaluate_retrieval(model, loader, device, topk=(1, 5, 10)):
 
 \subsection*{A.3 可视化脚本}
 
-项目包含三个可视化脚本：
+项目包含以下可视化脚本与推理 Demo：
 
 \begin{itemize}[nosep]
-    \item \texttt{visualize\_heatmap.py}：生成跨模态相似度矩阵热力图，支持预训练模型和本地模型两种模式；
-    \item \texttt{visualize\_topk.py}：Top-K 检索可视化与 Bad Case 自动挖掘（从头训练模型）；
-    \item \texttt{viz\_exp19.py}：Exp19 专用可视化脚本，生成热力图、Top-K 检索和 Bad Case 对比图。
+    \item \texttt{scripts/visualize\_heatmap.py}：生成跨模态相似度矩阵热力图；
+    \item \texttt{scripts/visualize\_topk.py}：Top-K 检索可视化与 Bad Case 自动挖掘；
+    \item \texttt{scripts/viz\_exp19.py / viz\_exp20.py / viz\_exp21.py}：各实验专用可视化脚本；
+    \item \texttt{app\_inference.py}：Gradio 推理 Demo，提供文本搜图和图片搜文交互界面。
 \end{itemize}
 
 使用方法：
 
-\begin{lstlisting}[language=bash, caption={可视化脚本使用方法}]
+\begin{lstlisting}[language=bash, caption={可视化脚本与推理 Demo 使用方法}]
 # 预训练模型热力图
-python visualize_heatmap.py --pretrained --data-dir Flickr8k --n-pairs 8
+python scripts/visualize_heatmap.py --pretrained --data-dir Flickr8k --n-pairs 8
 
-# 本地模型热力图
-python visualize_heatmap.py --checkpoint outputs/exp6/best_siglip.pt --data-dir Flickr8k
-
-# Top-K 检索
-python visualize_topk.py --checkpoint outputs/exp6/best_siglip.pt \
-    --data-dir Flickr8k --caption "A dog runs through the grass" --topk 5
-
-# Bad Case 挖掘
-python visualize_topk.py --checkpoint outputs/exp6/best_siglip.pt \
-    --data-dir Flickr8k --find-bad-cases --num-bad 3
-
-# Exp19 可视化（热力图 + Top-K + Bad Case）
-python viz_exp19.py \
-    --checkpoint outputs/exp19_pretrained_vit/best_siglip.pt \
+# Exp21 可视化（热力图 + Top-K + Bad Case）
+python scripts/viz_exp21.py \
+    --checkpoint outputs/exp21_dual_pretrained_v2/best_siglip.pt \
     --data-dir Flickr8k --output-dir viz_outputs
+
+# 推理 Demo
+python app_inference.py    # 访问 http://localhost:7861
 \end{lstlisting}
 
 \end{document}

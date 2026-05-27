@@ -1,5 +1,9 @@
-torch>=2.0
-torchvision>=0.15
+torch>=2.1.0
+torchvision>=0.16
 pillow>=9.0
 numpy>=1.21
 tqdm>=4.65
+transformers>=4.35.0
+gradio>=4.15.0
+plotly>=5.0
+datasets>=2.14
