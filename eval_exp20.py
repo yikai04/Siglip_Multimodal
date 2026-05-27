@@ -11,6 +11,7 @@ from tqdm import tqdm
 from data_loader import Flickr8kDistilBERTDataset, build_siglip_transform
 from loss import SigLIPLoss
 from models.dual_pretrained_siglip import SigLIPDualPretrainedModel
+from utils import AverageMeter
 
 
 @torch.no_grad()
@@ -92,8 +93,6 @@ def evaluate_loss(model, criterion, loader, device):
 
 
 def main():
-    from utils import AverageMeter
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt_path = "outputs/exp20_dual_pretrained/best_siglip.pt"
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)

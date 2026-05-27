@@ -1,0 +1,98 @@
+Total params: 159,837,696
+Trainable: 88,217,090 (ViT top=21,263,616, DistilBERT=66,362,880, proj=590,592, loss=2)
+device=cuda total_steps=50550 warmup_steps=5055
+LR groups: vit=1e-05, distilbert=2e-05, proj=0.0003
+epoch=001 train_loss=4.4077 val_loss=4.4256 scale=10.32 bias=-9.99 t2i_R@1=5.56 i2t_R@1=7.73 t2i_R@5=18.27 i2t_R@5=24.16 t2i_R@10=27.91 i2
+epoch=002 train_loss=1.9113 val_loss=3.0564 scale=11.31 bias=-9.94 t2i_R@1=15.70 i2t_R@1=16.92 t2i_R@5=38.86 i2t_R@5=41.95 t2i_R@10=52.51
+epoch=003 train_loss=1.3032 val_loss=2.4008 scale=12.67 bias=-9.87 t2i_R@1=25.02 i2t_R@1=26.91 t2i_R@5=55.92 i2t_R@5=57.49 t2i_R@10=69.12
+epoch=004 train_loss=0.9433 val_loss=1.9538 scale=14.15 bias=-9.82 t2i_R@1=31.67 i2t_R@1=33.41 t2i_R@5=63.41 i2t_R@5=64.53 t2i_R@10=76.39
+epoch=005 train_loss=0.7307 val_loss=1.8343 scale=15.75 bias=-9.80 t2i_R@1=36.12 i2t_R@1=37.53 t2i_R@5=68.85 i2t_R@5=68.65 t2i_R@10=80.10
+epoch=006 train_loss=0.5964 val_loss=1.6450 scale=17.14 bias=-9.82 t2i_R@1=39.31 i2t_R@1=40.04 t2i_R@5=72.63 i2t_R@5=71.78 t2i_R@10=83.56
+epoch=007 train_loss=0.5004 val_loss=1.5145 scale=18.30 bias=-9.85 t2i_R@1=42.00 i2t_R@1=43.23 t2i_R@5=74.17 i2t_R@5=74.16 t2i_R@10=84.45
+epoch=008 train_loss=0.4405 val_loss=1.3192 scale=19.18 bias=-9.91 t2i_R@1=42.22 i2t_R@1=44.87 t2i_R@5=73.30 i2t_R@5=74.28 t2i_R@10=83.86
+epoch=009 train_loss=0.3870 val_loss=1.2111 scale=20.02 bias=-9.97 t2i_R@1=45.02 i2t_R@1=46.06 t2i_R@5=75.95 i2t_R@5=76.67 t2i_R@10=86.16
+epoch=010 train_loss=0.3510 val_loss=1.2355 scale=20.65 bias=-10.03 t2i_R@1=46.85 i2t_R@1=47.97 t2i_R@5=76.76 i2t_R@5=77.95 t2i_R@10=86.63
+                  epoch=011 train_loss=0.3224 val_loss=1.1812 scale=21.18 bias=-10.10 t2i_R@1=47.49 i2t_R@1=49.28 t2i_R@5=77.85 i2t_R@5=78
+epoch=012 train_loss=0.2961 val_loss=1.1616 scale=21.54 bias=-10.17 t2i_R@1=48.55 i2t_R@1=49.22 t2i_R@5=79.16 i2t_R@5=78.58 t2i_R@10=87.47
+epoch=013 train_loss=0.2749 val_loss=1.1271 scale=21.90 bias=-10.24 t2i_R@1=49.79 i2t_R@1=50.45 t2i_R@5=79.73 i2t_R@5=79.36 t2i_R@10=88.28
+epoch=014 train_loss=0.2563 val_loss=1.0693 scale=22.16 bias=-10.32 t2i_R@1=50.14 i2t_R@1=51.43 t2i_R@5=80.30 i2t_R@5=80.49 t2i_R@10=88.28
+epoch=015 train_loss=0.2345 val_loss=1.0516 scale=22.46 bias=-10.39 t2i_R@1=49.67 i2t_R@1=51.97 t2i_R@5=79.11 i2t_R@5=80.70 t2i_R@10=88.26
+epoch=016 train_loss=0.2273 val_loss=1.0284 scale=22.59 bias=-10.47 t2i_R@1=51.00 i2t_R@1=53.34 t2i_R@5=80.42 i2t_R@5=80.67 t2i_R@10=88.53
+epoch=017 train_loss=0.2205 val_loss=1.0278 scale=22.63 bias=-10.54 t2i_R@1=52.06 i2t_R@1=54.24 t2i_R@5=80.15 i2t_R@5=80.97 t2i_R@10=88.33
+epoch=018 train_loss=0.2067 val_loss=1.0265 scale=22.57 bias=-10.62 t2i_R@1=53.18 i2t_R@1=53.25 t2i_R@5=81.26 i2t_R@5=81.68 t2i_R@10=88.78
+epoch=019 train_loss=0.1919 val_loss=1.0016 scale=22.53 bias=-10.69 t2i_R@1=53.05 i2t_R@1=54.47 t2i_R@5=81.06 i2t_R@5=81.41 t2i_R@10=89.52
+epoch=020 train_loss=0.1865 val_loss=1.0079 scale=22.48 bias=-10.77 t2i_R@1=53.40 i2t_R@1=54.50 t2i_R@5=80.42 i2t_R@5=81.50 t2i_R@10=89.62
+epoch=021 train_loss=0.1779 val_loss=0.9951 scale=22.47 bias=-10.83 t2i_R@1=52.81 i2t_R@1=53.43 t2i_R@5=81.14 i2t_R@5=81.50 t2i_R@10=89.27
+epoch=022 train_loss=0.1771 val_loss=0.9895 scale=22.21 bias=-10.91 t2i_R@1=53.72 i2t_R@1=54.18 t2i_R@5=81.38 i2t_R@5=82.37 t2i_R@10=89.44
+epoch=023 train_loss=0.1645 val_loss=0.9899 scale=22.10 bias=-10.98 t2i_R@1=53.99 i2t_R@1=54.86 t2i_R@5=81.78 i2t_R@5=81.95 t2i_R@10=89.49
+epoch=024 train_loss=0.1620 val_loss=0.9600 scale=21.87 bias=-11.05 t2i_R@1=53.97 i2t_R@1=54.77 t2i_R@5=81.51 i2t_R@5=82.07 t2i_R@10=89.42
+epoch=025 train_loss=0.1523 val_loss=0.9661 scale=21.84 bias=-11.11 t2i_R@1=54.76 i2t_R@1=55.82 t2i_R@5=82.22 i2t_R@5=82.58 t2i_R@10=89.77
+epoch=026 train_loss=0.1530 val_loss=0.9539 scale=21.65 bias=-11.17 t2i_R@1=54.61 i2t_R@1=56.29 t2i_R@5=82.55 i2t_R@5=82.73 t2i_R@10=89.91
+epoch=027 train_loss=0.1417 val_loss=0.9453 scale=21.58 bias=-11.23 t2i_R@1=55.23 i2t_R@1=56.77 t2i_R@5=82.42 i2t_R@5=83.32 t2i_R@10=89.99
+epoch=028 train_loss=0.1389 val_loss=0.9592 scale=21.43 bias=-11.28 t2i_R@1=54.39 i2t_R@1=56.21 t2i_R@5=82.45 i2t_R@5=83.17 t2i_R@10=89.79
+epoch=029 train_loss=0.1318 val_loss=0.9597 scale=21.36 bias=-11.33 t2i_R@1=55.01 i2t_R@1=56.12 t2i_R@5=82.94 i2t_R@5=83.00 t2i_R@10=89.54
+epoch=030 train_loss=0.1317 val_loss=0.9583 scale=21.22 bias=-11.38 t2i_R@1=55.75 i2t_R@1=56.86 t2i_R@5=82.50 i2t_R@5=83.23 t2i_R@10=89.77
+epoch=031 train_loss=0.1295 val_loss=0.9495 scale=21.11 bias=-11.43 t2i_R@1=55.43 i2t_R@1=56.68 t2i_R@5=81.90 i2t_R@5=83.05 t2i_R@10=89.77
+epoch=032 train_loss=0.1250 val_loss=0.9631 scale=21.02 bias=-11.47 t2i_R@1=55.65 i2t_R@1=56.29 t2i_R@5=82.42 i2t_R@5=82.76 t2i_R@10=89.77
+epoch=033 train_loss=0.1223 val_loss=0.9579 scale=20.89 bias=-11.51 t2i_R@1=55.40 i2t_R@1=57.10 t2i_R@5=82.03 i2t_R@5=83.11 t2i_R@10=90.01
+epoch=034 train_loss=0.1228 val_loss=0.9545 scale=20.77 bias=-11.54 t2i_R@1=55.95 i2t_R@1=57.31 t2i_R@5=82.25 i2t_R@5=83.41 t2i_R@10=90.04
+epoch=035 train_loss=0.1212 val_loss=0.9531 scale=20.68 bias=-11.57 t2i_R@1=55.25 i2t_R@1=56.74 t2i_R@5=82.62 i2t_R@5=83.65 t2i_R@10=90.04
+epoch=036 train_loss=0.1170 val_loss=0.9582 scale=20.59 bias=-11.60 t2i_R@1=55.90 i2t_R@1=57.28 t2i_R@5=82.82 i2t_R@5=83.35 t2i_R@10=89.86
+epoch=037 train_loss=0.1185 val_loss=0.9607 scale=20.54 bias=-11.63 t2i_R@1=56.17 i2t_R@1=57.16 t2i_R@5=82.72 i2t_R@5=83.44 t2i_R@10=90.01
+epoch=038 train_loss=0.1090 val_loss=0.9495 scale=20.52 bias=-11.65 t2i_R@1=56.17 i2t_R@1=57.73 t2i_R@5=82.84 i2t_R@5=83.56 t2i_R@10=90.16
+epoch=039 train_loss=0.1091 val_loss=0.9557 scale=20.46 bias=-11.67 t2i_R@1=55.62 i2t_R@1=58.11 t2i_R@5=82.84 i2t_R@5=83.32 t2i_R@10=89.79
+epoch=040 train_loss=0.1048 val_loss=0.9566 scale=20.45 bias=-11.68 t2i_R@1=56.29 i2t_R@1=57.43 t2i_R@5=82.62 i2t_R@5=83.08 t2i_R@10=89.62
+        device=device,
+Total params: 159,837,696
+Trainable: 36,029,954 (ViT top=21,263,616, DistilBERT top=14,175,744, proj=590,592, loss=2)
+device=cuda total_steps=50550 warmup_steps=5055
+LR groups: vit=1e-05, db_top=2e-05, proj=0.0003
+epoch=001 train_loss=4.5773 val_loss=4.4190 scale=10.32 bias=-9.99 t2i_R@1=7.19 i2t_R@1=8.89 t2i_R@5=21.63 i2t_R@5=26.79 t2i_R@10=32.53 i2
+epoch=002 train_loss=1.9676 val_loss=3.1451 scale=11.30 bias=-9.94 t2i_R@1=16.69 i2t_R@1=17.30 t2i_R@5=40.02 i2t_R@5=41.83 t2i_R@10=53.00
+epoch=003 train_loss=1.3880 val_loss=2.5510 scale=12.67 bias=-9.87 t2i_R@1=24.28 i2t_R@1=25.24 t2i_R@5=53.37 i2t_R@5=54.42 t2i_R@10=67.49
+epoch=004 train_loss=1.0337 val_loss=2.0012 scale=14.22 bias=-9.82 t2i_R@1=31.20 i2t_R@1=32.61 t2i_R@5=62.77 i2t_R@5=62.56 t2i_R@10=74.66
+epoch=005 train_loss=0.8146 val_loss=1.9189 scale=15.91 bias=-9.79 t2i_R@1=34.96 i2t_R@1=36.10 t2i_R@5=66.75 i2t_R@5=66.32 t2i_R@10=78.47
+epoch=006 train_loss=0.6735 val_loss=1.7709 scale=17.45 bias=-9.79 t2i_R@1=38.79 i2t_R@1=38.84 t2i_R@5=70.63 i2t_R@5=69.81 t2i_R@10=82.08
+epoch=007 train_loss=0.5701 val_loss=1.6956 scale=18.82 bias=-9.82 t2i_R@1=40.89 i2t_R@1=41.68 t2i_R@5=73.55 i2t_R@5=72.76 t2i_R@10=83.61
+epoch=008 train_loss=0.5087 val_loss=1.3516 scale=19.84 bias=-9.87 t2i_R@1=41.73 i2t_R@1=42.75 t2i_R@5=72.86 i2t_R@5=73.09 t2i_R@10=83.66
+epoch=009 train_loss=0.4493 val_loss=1.3158 scale=20.87 bias=-9.92 t2i_R@1=43.16 i2t_R@1=44.27 t2i_R@5=75.20 i2t_R@5=74.94 t2i_R@10=85.12
+epoch=010 train_loss=0.4111 val_loss=1.3674 scale=21.68 bias=-9.97 t2i_R@1=45.36 i2t_R@1=46.03 t2i_R@5=75.65 i2t_R@5=75.48 t2i_R@10=85.96
+epoch=011 train_loss=0.3803 val_loss=1.2829 scale=22.35 bias=-10.03 t2i_R@1=47.29 i2t_R@1=48.18 t2i_R@5=77.53 i2t_R@5=77.42 t2i_R@10=86.65
+epoch=012 train_loss=0.3483 val_loss=1.2351 scale=22.87 bias=-10.10 t2i_R@1=47.66 i2t_R@1=48.24 t2i_R@5=78.20 i2t_R@5=77.68 t2i_R@10=87.74
+epoch=013 train_loss=0.3233 val_loss=1.1509 scale=23.38 bias=-10.16 t2i_R@1=48.80 i2t_R@1=49.46 t2i_R@5=78.71 i2t_R@5=79.59 t2i_R@10=87.47
+epoch=014 train_loss=0.3038 val_loss=1.1393 scale=23.84 bias=-10.23 t2i_R@1=49.81 i2t_R@1=50.21 t2i_R@5=79.88 i2t_R@5=79.56 t2i_R@10=88.18
+epoch=015 train_loss=0.2768 val_loss=1.0876 scale=24.29 bias=-10.29 t2i_R@1=50.36 i2t_R@1=50.81 t2i_R@5=79.43 i2t_R@5=79.45 t2i_R@10=88.08
+epoch=016 train_loss=0.2729 val_loss=1.0980 scale=24.48 bias=-10.36 t2i_R@1=50.85 i2t_R@1=51.88 t2i_R@5=79.73 i2t_R@5=79.24 t2i_R@10=88.48
+epoch=017 train_loss=0.2591 val_loss=1.0343 scale=24.70 bias=-10.43 t2i_R@1=51.72 i2t_R@1=51.76 t2i_R@5=79.65 i2t_R@5=80.34 t2i_R@10=88.43
+epoch=018 train_loss=0.2457 val_loss=1.0736 scale=24.83 bias=-10.50 t2i_R@1=52.31 i2t_R@1=52.33 t2i_R@5=80.99 i2t_R@5=81.06 t2i_R@10=88.90
+epoch=019 train_loss=0.2284 val_loss=1.0553 scale=24.91 bias=-10.56 t2i_R@1=52.46 i2t_R@1=53.97 t2i_R@5=80.32 i2t_R@5=80.73 t2i_R@10=88.90
+epoch=020 train_loss=0.2238 val_loss=1.0190 scale=24.97 bias=-10.63 t2i_R@1=52.90 i2t_R@1=53.22 t2i_R@5=80.42 i2t_R@5=80.97 t2i_R@10=89.02
+epoch=021 train_loss=0.2143 val_loss=1.0416 scale=25.09 bias=-10.69 t2i_R@1=53.72 i2t_R@1=52.71 t2i_R@5=81.19 i2t_R@5=81.21 t2i_R@10=89.39
+epoch=022 train_loss=0.2090 val_loss=1.0001 scale=24.96 bias=-10.76 t2i_R@1=54.46 i2t_R@1=54.53 t2i_R@5=81.80 i2t_R@5=81.71 t2i_R@10=89.37
+epoch=023 train_loss=0.1983 val_loss=1.0007 scale=24.91 bias=-10.82 t2i_R@1=53.89 i2t_R@1=54.00 t2i_R@5=81.83 i2t_R@5=81.32 t2i_R@10=89.22
+epoch=024 train_loss=0.1961 val_loss=0.9782 scale=24.73 bias=-10.88 t2i_R@1=54.41 i2t_R@1=55.19 t2i_R@5=81.46 i2t_R@5=81.98 t2i_R@10=89.15
+epoch=025 train_loss=0.1852 val_loss=0.9866 scale=24.75 bias=-10.94 t2i_R@1=55.03 i2t_R@1=54.65 t2i_R@5=81.98 i2t_R@5=82.19 t2i_R@10=89.57
+epoch=026 train_loss=0.1852 val_loss=0.9717 scale=24.70 bias=-10.99 t2i_R@1=54.78 i2t_R@1=55.01 t2i_R@5=81.71 i2t_R@5=82.28 t2i_R@10=89.59
+epoch=027 train_loss=0.1717 val_loss=0.9585 scale=24.67 bias=-11.05 t2i_R@1=55.40 i2t_R@1=55.43 t2i_R@5=82.08 i2t_R@5=82.58 t2i_R@10=89.47
+epoch=028 train_loss=0.1666 val_loss=0.9483 scale=24.72 bias=-11.09 t2i_R@1=55.35 i2t_R@1=55.22 t2i_R@5=82.10 i2t_R@5=82.40 t2i_R@10=89.52
+epoch=029 train_loss=0.1611 val_loss=0.9617 scale=24.65 bias=-11.14 t2i_R@1=55.75 i2t_R@1=55.82 t2i_R@5=82.27 i2t_R@5=82.61 t2i_R@10=89.77
+epoch=030 train_loss=0.1599 val_loss=0.9554 scale=24.54 bias=-11.19 t2i_R@1=56.19 i2t_R@1=56.65 t2i_R@5=82.15 i2t_R@5=82.73 t2i_R@10=89.67
+epoch=031 train_loss=0.1577 val_loss=0.9420 scale=24.43 bias=-11.23 t2i_R@1=56.34 i2t_R@1=56.03 t2i_R@5=82.00 i2t_R@5=82.73 t2i_R@10=89.72
+epoch=032 train_loss=0.1528 val_loss=0.9377 scale=24.37 bias=-11.27 t2i_R@1=56.04 i2t_R@1=56.47 t2i_R@5=82.84 i2t_R@5=82.79 t2i_R@10=90.21
+epoch=033 train_loss=0.1468 val_loss=0.9321 scale=24.29 bias=-11.31 t2i_R@1=56.12 i2t_R@1=56.53 t2i_R@5=82.52 i2t_R@5=82.73 t2i_R@10=90.06
+epoch=034 train_loss=0.1490 val_loss=0.9277 scale=24.17 bias=-11.34 t2i_R@1=56.19 i2t_R@1=56.71 t2i_R@5=82.87 i2t_R@5=83.08 t2i_R@10=90.14
+epoch=035 train_loss=0.1453 val_loss=0.9276 scale=24.11 bias=-11.37 t2i_R@1=56.98 i2t_R@1=56.74 t2i_R@5=82.87 i2t_R@5=83.08 t2i_R@10=90.19
+epoch=036 train_loss=0.1408 val_loss=0.9292 scale=24.03 bias=-11.40 t2i_R@1=56.89 i2t_R@1=57.10 t2i_R@5=82.82 i2t_R@5=83.03 t2i_R@10=89.86
+epoch=037 train_loss=0.1410 val_loss=0.9297 scale=24.01 bias=-11.42 t2i_R@1=57.01 i2t_R@1=57.25 t2i_R@5=82.67 i2t_R@5=82.73 t2i_R@10=90.09
+epoch=038 train_loss=0.1347 val_loss=0.9265 scale=23.98 bias=-11.44 t2i_R@1=57.53 i2t_R@1=57.16 t2i_R@5=82.84 i2t_R@5=83.32 t2i_R@10=90.23
+epoch=039 train_loss=0.1320 val_loss=0.9264 scale=23.90 bias=-11.46 t2i_R@1=57.31 i2t_R@1=57.37 t2i_R@5=82.77 i2t_R@5=83.20 t2i_R@10=90.16
+epoch=040 train_loss=0.1290 val_loss=0.9203 scale=23.87 bias=-11.48 t2i_R@1=57.23 i2t_R@1=57.16 t2i_R@5=82.74 i2t_R@5=83.00 t2i_R@10=90.11
+epoch=041 train_loss=0.1354 val_loss=0.9181 scale=23.80 bias=-11.49 t2i_R@1=57.38 i2t_R@1=57.40 t2i_R@5=82.97 i2t_R@5=83.59 t2i_R@10=89.99
+epoch=042 train_loss=0.1304 val_loss=0.9155 scale=23.78 bias=-11.50 t2i_R@1=57.03 i2t_R@1=57.31 t2i_R@5=82.94 i2t_R@5=83.59 t2i_R@10=90.53
+epoch=043 train_loss=0.1289 val_loss=0.9212 scale=23.75 bias=-11.51 t2i_R@1=57.35 i2t_R@1=57.52 t2i_R@5=82.77 i2t_R@5=83.26 t2i_R@10=90.56
+epoch=044 train_loss=0.1270 val_loss=0.9197 scale=23.73 bias=-11.52 t2i_R@1=57.50 i2t_R@1=57.46 t2i_R@5=82.89 i2t_R@5=83.47 t2i_R@10=90.41
+epoch=045 train_loss=0.1307 val_loss=0.9177 scale=23.71 bias=-11.52 t2i_R@1=57.53 i2t_R@1=57.61 t2i_R@5=82.99 i2t_R@5=83.35 t2i_R@10=90.61
+epoch=046 train_loss=0.1237 val_loss=0.9175 scale=23.70 bias=-11.53 t2i_R@1=57.26 i2t_R@1=57.64 t2i_R@5=83.04 i2t_R@5=83.35 t2i_R@10=90.53
+epoch=047 train_loss=0.1306 val_loss=0.9187 scale=23.68 bias=-11.53 t2i_R@1=57.35 i2t_R@1=57.76 t2i_R@5=82.94 i2t_R@5=83.50 t2i_R@10=90.68
+epoch=048 train_loss=0.1320 val_loss=0.9179 scale=23.67 bias=-11.53 t2i_R@1=57.38 i2t_R@1=57.67 t2i_R@5=83.11 i2t_R@5=83.23 t2i_R@10=90.61
+epoch=049 train_loss=0.1304 val_loss=0.9176 scale=23.67 bias=-11.53 t2i_R@1=57.55 i2t_R@1=57.67 t2i_R@5=82.97 i2t_R@5=83.41 t2i_R@10=90.73
