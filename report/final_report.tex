@@ -45,26 +45,63 @@
     tabsize=4,
     captionpos=b,
 }
-
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[C]{基于SigLIP的小规模图文检索系统——最终报告}
 \fancyfoot[C]{\thepage}
 
-\title{\textbf{基于SigLIP的小规模图文检索系统}\\\Large 最终报告}
-\author{黄翊愷 \\ 2023080001 \\ 无33}
-\date{2026年5月}
-
 \begin{document}
 
-\maketitle
-\thispagestyle{fancy}
+\begin{titlepage}
+    \centering
+    \vspace*{2cm} % 顶部留白
 
-\begin{abstract}
+    % 顶部修饰线与主副标题
+    \rule{\textwidth}{2pt} \vspace{0.8cm}
+    {\Huge \textbf{基于SigLIP的小规模图文检索系统} \par}
+    \vspace{0.6cm}
+    {\huge \textbf{最终报告} \par}
+    \vspace{0.6cm} \rule{\textwidth}{2pt}
+
+    \vspace{4.5cm} % 调整中部留白，将信息推向视觉中心
+
+    % 作者信息（使用表格实现两端对齐与下划线）
+    {\Large
+    \renewcommand{\arraystretch}{1.8} % 撑开表格行距，避免拥挤
+    \begin{tabular}{cc}
+        \makebox[4em][s]{\textbf{院 系}} & \makebox[8em][c]{电子工程系} \\
+        \hline
+        \makebox[4em][s]{\textbf{姓 名}} & \makebox[8em][c]{黄翊愷} \\
+        \hline
+        \makebox[4em][s]{\textbf{学 号}} & \makebox[8em][c]{2023080001} \\
+        \hline
+        \makebox[4em][s]{\textbf{班 级}} & \makebox[8em][c]{无33} \\
+        \hline
+    \end{tabular}
+    \par}
+
+    \vfill % 自动填充空白，将日期推至底部
+
+    % 底部日期
+    {\Large \textbf{2026年 5月} \par}
+    \vspace*{2cm}
+\end{titlepage}
+
+% ==================== 摘要部分独立排版 ====================
+\newpage
+\thispagestyle{fancy} % 确保摘要页也有页眉
+\setcounter{page}{1}  % 摘要页通常作为第一页起算
+
+\begin{center}
+    {\Large \textbf{摘\quad 要}}
+\end{center}
+\vspace{1em}
+
+% 略微增加摘要的行间距，提升长段落的阅读体验
+{\linespread{1.3}\selectfont
 本项目基于 SigLIP（Sigmoid Loss for Language-Image Pretraining）模型，在 Flickr8k 数据集上实现了一个小规模图文检索系统。与 CLIP 使用 softmax 全局归一化不同，SigLIP 对每个图文对独立使用 sigmoid 判断是否匹配，对 batch size 更鲁棒。
 
-项目经历了四个阶段的系统性优化。\textbf{第一阶段}（中期基线）：使用 ResNet18 + MLP/Transformer 从头训练，t2i\_R@1 约 27\%，发现过拟合是主要瓶颈。\textbf{第二阶段}（从头训练优化）：经过 19 组实验（Exp0--18）探索学习率调度、模型容量、数据增强等策略，最优配置（Exp6）达到 t2i\_R@1=36.65\%，但天花板明显。\textbf{第三阶段}（预训练突破）：引入预训练 ViT-B/16 替换从头训练的 ResNet18，Exp19 一跃达到 47.36\%（+10.71pp），仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果。\textbf{第四阶段}（双预训练 + 部分解冻）：进一步引入预训练 DistilBERT，Exp20 全解冻导致过拟合（88M 可训练参数），Exp21 采用部分解冻策略（仅 36M 可训练参数）取得最终最优结果 t2i\_R@1=58.03\%、i2t\_R@1=60.09\%，相比基线提升 36.77 个百分点。此外，BF16 半精度推理实现 3.82$\times$ 加速且精度几乎无损，而层剪枝和 INT8 动态量化在无重训练条件下严重损害精度。
-\end{abstract}
+项目经历了四个阶段的系统性优化。\textbf{第一阶段}（中期基线）：使用 ResNet18 + MLP/Transformer 从头训练，t2i\_R@1 约 27\%，发现过拟合是主要瓶颈。\textbf{第二阶段}（从头训练优化）：经过 19 组实验（Exp0--18）探索学习率调度、模型容量、数据增强等策略，最优配置（Exp6）达到 t2i\_R@1=36.65\%，但天花板明显。\textbf{第三阶段}（预训练突破）：引入预训练 ViT-B/16 替换从头训练的 ResNet18，Exp19 一跃达到 47.36\%（+10.71pp），仅 12 个 epoch 即超过 Exp6 的 100 epoch 结果。\textbf{第四阶段}（双预训练 + 部分解冻）：进一步引入预训练 DistilBERT，Exp20 全解冻导致过拟合（88M 可训练参数），Exp21 采用部分解冻策略（仅 36M 可训练参数）取得最终最优结果 t2i\_R@1=58.03\%、i2t\_R@1=60.09\%，相比基线提升 36.77 个百分点。此外，BF16 半精度推理实现 3.82$\times$ 加速且精度几乎无损，而层剪枝和 INT8 动态量化在无重训练条件下严重损害精度。\par}
 
 \newpage
 \tableofcontents
@@ -181,7 +218,8 @@ Baseline 架构在 Flickr8k 小数据集上从头训练的天花板约为 36.65\
 \begin{table}[H]
 \centering
 \caption{模型架构演进对比}
-\small
+% 将表格宽度限制为文本宽度（\textwidth），高度按比例自动缩放（!）
+\resizebox{\textwidth}{!}{
 \begin{tabular}{lcccc}
 \toprule
 \textbf{实验} & \textbf{视觉编码器} & \textbf{文本编码器} & \textbf{解冻策略} & \textbf{可训练参数} \\
@@ -193,6 +231,7 @@ Exp20 & ViT-B/16 顶层3层 & DistilBERT 全6层 & DistilBERT 全解冻 & 88.2M 
 Exp21 & ViT-B/16 顶层3层 & DistilBERT 顶层2层 & 双方部分解冻 + 差分LR & 36.0M \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
 \noindent \textbf{Exp19}：将图像编码器替换为 HuggingFace 预训练的 \texttt{google/siglip-base-patch16-224} 的 ViT-B/16（86M 参数，全部冻结），仅训练 2 层 Transformer 文本编码器（$d=768$，12 头注意力）和 image adapter（线性层将 ViT 输出映射到共享空间）。图像预处理改用 SigLIP 归一化（mean=[0.5, 0.5, 0.5]，std=[0.5, 0.5, 0.5]）匹配预训练分布。\\
