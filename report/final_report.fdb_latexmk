@@ -1,10 +1,10 @@
 # Fdb version 4
-["xdvipdfmx"] 1779937294.86136 "final_report.xdv" "final_report.pdf" "final_report" 1779937337.21141 0
-  "final_report.xdv" 1779937294 375708 fb9e253802f7b0ace6455fe4488da1c1 "xelatex"
+["xdvipdfmx"] 1779968858.22258 "final_report.xdv" "final_report.pdf" "final_report" 1779968897.18869 0
+  "final_report.xdv" 1779968858 377164 f3504714e176b8dde8b4201eebf2b297 "xelatex"
   (generated)
   "final_report.pdf"
   (rewritten before read)
-["xelatex"] 1779937292.91906 "d:/Coding/Latex/MediaAndCognition/MidTermAssignment/repository/report/final_report.tex" "final_report.xdv" "final_report" 1779937337.20009 0
+["xelatex"] 1779968856.63234 "d:/Coding/Latex/MediaAndCognition/MidTermAssignment/repository/report/final_report.tex" "final_report.xdv" "final_report" 1779968897.17849 0
   "../viz_outputs/badcase1_comparison.png" 1779701643 3798096 87f0686124e354adca494b495eee4b8d ""
   "../viz_outputs/badcase2_comparison.png" 1779701641 4634457 3559a717e3dddc7ff3af72cc3ed1cefc ""
   "../viz_outputs/exp19_badcase1_comparison.png" 1779778531 4206842 81557aa2cbdfde6e20044bc75a9101ad ""
@@ -149,13 +149,13 @@
   "C:/Users/Yi Kai/AppData/Local/Programs/MiKTeX/tex/xelatex/xecjk/xeCJK.sty" 1659726270 183137 ed372550124703b2b73cbcc0b47cb20f ""
   "C:/Users/Yi Kai/AppData/Local/Programs/MiKTeX/tex/xelatex/xecjk/xeCJKfntef.sty" 1659726270 39577 b470f8a1dbecc9c45c9bf05ca7db9188 ""
   "C:/Windows/Fonts/msyh.ttc" 1745754365 19704352 1e10e74402e59d54499af795caf0b135 ""
-  "d:/Coding/Latex/MediaAndCognition/MidTermAssignment/repository/report/final_report.tex" 1779937268 44746 c7aeb0ae8c5ffa6d35572f97829891a1 ""
+  "d:/Coding/Latex/MediaAndCognition/MidTermAssignment/repository/report/final_report.tex" 1779941613 44912 9df707304889fd731c7890d8bf1d6d76 ""
   "figures/Gradio_WebUI_Image_to_Text_Screenshot.jpg" 1779890279 325966 28bcdddf0ae37ce9255a855dc095a587 ""
   "figures/Gradio_WebUI_Text_to_Image_Screenshot.jpg" 1779890172 397103 7872e0ab2ac9b2cd20df33569544f0db ""
-  "final_report.aux" 1779937294 10635 1f7dfdf637b153fb3c02ed3149d3707e "xelatex"
-  "final_report.out" 1779937294 5685 01fd409828bbd359578f6522ec649ce3 "xelatex"
-  "final_report.tex" 1779937268 44746 c7aeb0ae8c5ffa6d35572f97829891a1 ""
-  "final_report.toc" 1779937294 3780 d5700fe1ffbb29abd100ecc90d4d47ee "xelatex"
+  "final_report.aux" 1779968858 10635 1f7dfdf637b153fb3c02ed3149d3707e "xelatex"
+  "final_report.out" 1779968858 5685 01fd409828bbd359578f6522ec649ce3 "xelatex"
+  "final_report.tex" 1779941613 44912 9df707304889fd731c7890d8bf1d6d76 ""
+  "final_report.toc" 1779968858 3780 d5700fe1ffbb29abd100ecc90d4d47ee "xelatex"
   (generated)
   "final_report.aux"
   "final_report.log"
